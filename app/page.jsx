@@ -44,42 +44,51 @@ const F = {
 
 /* ── All 15 games ── */
 const ALL_GAMES = [
-  { away:"NYM", home:"COL", venue:"Coors Field",       city:"Denver",         st:"CO", time:"5:40 PM ET",
-    awayP:"Huascar Brazoban",   awayH:"RHP", awayERA:1.15, awayRec:"2-0",
-    homeP:"Tomoyuki Sugano",    homeH:"RHP", homeERA:2.84, homeRec:"3-1" },
-  { away:"PHI", home:"MIA", venue:"loanDepot Park",    city:"Miami",          st:"FL", time:"6:40 PM ET",
-    awayP:"Aaron Nola",         awayH:"RHP", awayERA:6.03, awayRec:"1-3",
-    homeP:"Janson Junk",        homeH:"RHP", homeERA:3.00, homeRec:"2-2" },
-  { away:"TOR", home:"TB",  venue:"Tropicana Field",   city:"St. Petersburg", st:"FL", time:"6:40 PM ET",
-    awayP:"TBD",                awayH:"TBD", awayERA:null, awayRec:"?",
-    homeP:"Nick Martinez",      homeH:"RHP", homeERA:1.70, homeRec:"2-1" },
-  { away:"BOS", home:"DET", venue:"Comerica Park",     city:"Detroit",        st:"MI", time:"6:10 PM ET",
-    awayP:"Payton Tolle",       awayH:"LHP", awayERA:3.38, awayRec:"0-1",
-    homeP:"Tyler Holton",       homeH:"LHP", homeERA:5.27, homeRec:"0-1" },
-  { away:"CIN", home:"CHC", venue:"Wrigley Field",     city:"Chicago",        st:"IL", time:"7:10 PM ET",
-    awayP:"Chase Petty",        awayH:"RHP", awayERA:null, awayRec:"0-0",
-    homeP:"Edward Cabrera",     homeH:"RHP", homeERA:3.06, homeRec:"3-0" },
-  { away:"BAL", home:"NYY", venue:"Yankee Stadium",    city:"New York",       st:"NY", time:"7:05 PM ET",
-    awayP:"Shane Baz",          awayH:"RHP", awayERA:4.50, awayRec:"1-2",
-    homeP:"Cam Schlittler",     homeH:"RHP", homeERA:1.51, homeRec:"4-1" },
-  { away:"CLE", home:"KC",  venue:"Kauffman Stadium",  city:"Kansas City",    st:"MO", time:"7:40 PM ET",
-    awayP:"Tanner Bibee",       awayH:"RHP", awayERA:4.08, awayRec:"0-4",
-    homeP:"Michael Wacha",      homeH:"RHP", homeERA:3.13, homeRec:"2-2" },
-  { away:"MIL", home:"STL", venue:"Busch Stadium",     city:"St. Louis",      st:"MO", time:"7:45 PM ET",
-    awayP:"Chad Patrick",       awayH:"RHP", awayERA:2.57, awayRec:"2-1",
-    homeP:"Kyle Leahy",         homeH:"RHP", homeERA:5.52, homeRec:"3-3" },
-  { away:"LAD", home:"HOU", venue:"Daikin Park",       city:"Houston",        st:"TX", time:"8:10 PM ET",
-    awayP:"Yoshinobu Yamamoto", awayH:"RHP", awayERA:2.87, awayRec:"2-2",
-    homeP:"Steven Okert",       homeH:"LHP", homeERA:4.20, homeRec:"0-0" },
-  { away:"CWS", home:"LAA", venue:"Angel Stadium",     city:"Anaheim",        st:"CA", time:"9:38 PM ET",
-    awayP:"Davis Martin",       awayH:"RHP", awayERA:1.95, awayRec:"4-1",
-    homeP:"Jose Soriano",       homeH:"RHP", homeERA:0.84, homeRec:"5-1" },
-  { away:"ATL", home:"SEA", venue:"T-Mobile Park",     city:"Seattle",        st:"WA", time:"9:40 PM ET",
-    awayP:"JR Ritchie",         awayH:"RHP", awayERA:2.92, awayRec:"1-0",
-    homeP:"Logan Gilbert",      homeH:"RHP", homeERA:4.03, homeRec:"1-3" },
-  { away:"SD",  home:"SF",  venue:"Oracle Park",       city:"San Francisco",  st:"CA", time:"9:45 PM ET",
-    awayP:"Randy Vasquez",      awayH:"RHP", awayERA:2.94, awayRec:"3-0",
-    homeP:"Trevor McDonald",    homeH:"RHP", homeERA:null, homeRec:"0-0" },
+  { away:"TOR", home:"MIN", venue:"Target Field",        city:"Minneapolis",    st:"MN", time:"12:45 PM ET",
+    awayP:"Trey Yesavage",    awayH:"RHP", awayERA:0.00,  awayRec:"1-0",
+    homeP:"Joe Ryan",          homeH:"RHP", homeERA:3.76,  homeRec:"2-3" },
+  { away:"HOU", home:"BOS", venue:"Fenway Park",         city:"Boston",         st:"MA", time:"1:35 PM ET",
+    awayP:"Cody Bolton",      awayH:"RHP", awayERA:5.79,  awayRec:"0-1",
+    homeP:"Ranger Suarez",    homeH:"LHP", homeERA:3.09,  homeRec:"2-2" },
+  { away:"CIN", home:"PIT", venue:"PNC Park",            city:"Pittsburgh",     st:"PA", time:"1:35 PM ET",
+    awayP:"Chase Burns",      awayH:"RHP", awayERA:2.65,  awayRec:"3-1",
+    homeP:"Braxton Ashcraft", homeH:"RHP", homeERA:3.71,  homeRec:"1-2" },
+  { away:"BAL", home:"NYY", venue:"Yankee Stadium",      city:"New York",       st:"NY", time:"1:35 PM ET",
+    awayP:"Trey Gibson",      awayH:"RHP", awayERA:null,  awayRec:"0-0",
+    homeP:"Max Fried",        homeH:"LHP", homeERA:2.09,  homeRec:"4-1" },
+  { away:"MIL", home:"WSH", venue:"Nationals Park",      city:"Washington",     st:"DC", time:"1:35 PM ET",
+    awayP:"TBD",              awayH:"TBD", awayERA:null,  awayRec:"?",
+    homeP:"Zack Littell",     homeH:"RHP", homeERA:7.85,  homeRec:"0-4" },
+  { away:"SF",  home:"TB",  venue:"Tropicana Field",     city:"St. Petersburg", st:"FL", time:"1:40 PM ET",
+    awayP:"Tyler Mahle",      awayH:"RHP", awayERA:5.87,  awayRec:"1-4",
+    homeP:"Steven Matz",      homeH:"LHP", homeERA:4.31,  homeRec:"4-1" },
+  { away:"PHI", home:"MIA", venue:"loanDepot Park",      city:"Miami",          st:"FL", time:"1:40 PM ET",
+    awayP:"Jesus Luzardo",    awayH:"LHP", awayERA:5.50,  awayRec:"2-3",
+    homeP:"Chris Paddack",    homeH:"RHP", homeERA:6.11,  homeRec:"0-4" },
+  { away:"LAD", home:"STL", venue:"Busch Stadium",       city:"St. Louis",      st:"MO", time:"2:15 PM ET",
+    awayP:"Justin Wrobleski", awayH:"LHP", awayERA:1.50,  awayRec:"4-0",
+    homeP:"Dustin May",       homeH:"RHP", homeERA:5.28,  homeRec:"3-2" },
+  { away:"AZ",  home:"CHC", venue:"Wrigley Field",       city:"Chicago",        st:"IL", time:"2:20 PM ET",
+    awayP:"Merrill Kelly",    awayH:"RHP", awayERA:9.20,  awayRec:"1-2",
+    homeP:"Matthew Boyd",     homeH:"LHP", homeERA:7.00,  homeRec:"1-1" },
+  { away:"ATL", home:"COL", venue:"Coors Field",         city:"Denver",         st:"CO", time:"3:10 PM ET",
+    awayP:"Spencer Strider",  awayH:"RHP", awayERA:null,  awayRec:"0-0",
+    homeP:"Kyle Freeland",    homeH:"LHP", homeERA:3.48,  homeRec:"1-2" },
+  { away:"CLE", home:"ATH", venue:"Sutter Health Park",  city:"Sacramento",     st:"CA", time:"4:05 PM ET",
+    awayP:"Parker Messick",   awayH:"LHP", awayERA:1.73,  awayRec:"3-0",
+    homeP:"Aaron Civale",     homeH:"RHP", homeERA:3.23,  homeRec:"2-1" },
+  { away:"NYM", home:"LAA", venue:"Angel Stadium",       city:"Anaheim",        st:"CA", time:"4:07 PM ET",
+    awayP:"Clay Holmes",      awayH:"RHP", awayERA:1.75,  awayRec:"3-2",
+    homeP:"Jack Kochanowicz", homeH:"RHP", homeERA:3.09,  homeRec:"2-0" },
+  { away:"KC",  home:"SEA", venue:"T-Mobile Park",       city:"Seattle",        st:"WA", time:"4:10 PM ET",
+    awayP:"Kris Bubic",       awayH:"LHP", awayERA:3.74,  awayRec:"2-1",
+    homeP:"Luis Castillo",    homeH:"RHP", homeERA:6.35,  homeRec:"0-2" },
+  { away:"CWS", home:"SD",  venue:"Petco Park",          city:"San Diego",      st:"CA", time:"4:10 PM ET",
+    awayP:"Anthony Kay",      awayH:"LHP", awayERA:6.12,  awayRec:"1-1",
+    homeP:"Griffin Canning",  homeH:"RHP", homeERA:0.00,  homeRec:"0-0" },
+  { away:"TEX", home:"DET", venue:"Comerica Park",       city:"Detroit",        st:"MI", time:"7:20 PM ET",
+    awayP:"Jack Leiter",      awayH:"RHP", awayERA:5.17,  awayRec:"1-2",
+    homeP:"Tyler Holton",     homeH:"LHP", homeERA:5.54,  homeRec:"0-1" },
 ];
 
 /* ── Claude API ── */
@@ -90,13 +99,24 @@ class RateLimitError extends Error {
   }
 }
 
-async function callClaude(text, maxTokens = 8000) {
+async function callClaude(text, maxTokens = 8192) {
   // Call our own secure backend — never the Anthropic API directly (CORS blocks it)
   const r = await fetch("/api/claude", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, maxTokens }),
   });
+
+  // Check if we got HTML back (means the API route is missing or Vercel error)
+  const contentType = r.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    const html = await r.text();
+    if (html.includes("DOCTYPE")) {
+      throw new Error("API route not found — make sure app/api/claude/route.js is in GitHub and Vercel has ANTHROPIC_API_KEY set in Environment Variables.");
+    }
+    throw new Error("Unexpected response from server: " + html.slice(0, 100));
+  }
+
   const d = await r.json();
   if (d.type === "exceeded_limit" || d.error?.type === "exceeded_limit") {
     const ra = d.resetsAt || d.error?.resetsAt;
@@ -448,18 +468,13 @@ function buildPrompt(games) {
     "TODAY'S GAMES:",
     lines,
     "",
-    "TASK: For EACH game return the top 5 HR candidates (mix of both teams, best matchups first).",
+    "TASK: For EACH game return the top 3 HR candidates only (best HR spots from either team).",
     "Include each player's MLB MLBAM ID for headshots.",
     "",
-    "For each player provide:",
-    "- name, team, mlbId (MLBAM integer ID), emoji, teamColor (hex), isHome (bool)",
-    "- hrChancePct: realistic HR probability % for today (0-35, most players 3-15%)",
-    "  Factor in: pitcher ERA, WHIP, BvP, park factor, weather, platoon, current form",
-    "  High ERA/WHIP pitcher + hitter-friendly park = higher %. Elite pitcher = lower %.",
-    "- pitcher, pitcherHand, pitcherERA",
-    "- pitcherWhip: pitcher's 2026 WHIP (e.g. 1.24)",
-    "- hrAllowedVsTeam: how many HR this pitcher has allowed to THIS specific opposing team career/recent (integer, use best estimate)",
-    "- bvpSummary, homeAwaySplit, weatherInsight",
+    "For each player provide (be concise):",
+    "- name, team, mlbId, emoji, teamColor, isHome",
+    "- hrChancePct (0-35), pitcher, pitcherHand, pitcherERA, pitcherWhip, hrAllowedVsTeam",
+    "- bvpSummary (1 sentence), homeAwaySplit (1 line), weatherInsight (1 sentence)",
     "- seasonHRs, gamesPlayed, ops, exitVelo, parkFactor, simHRs (out of 10000), confidence",
     "",
     "Park HR factors: Coors=1.38 SutterHealth=1.28 Wrigley=1.14 Yankee=1.10 Fenway=1.06",
@@ -534,21 +549,31 @@ export default function App() {
       await new Promise(r => setTimeout(r, 200));
       pushLog("📊 Analyzing BvP + HR chance % per player...");
       await new Promise(r => setTimeout(r, 150));
-      pushLog("🖼️ Fetching player headshots & MLBAM IDs...");
-      await new Promise(r => setTimeout(r, 150));
-      pushLog("🌤 Estimating weather per stadium city...");
+      pushLog("🌤 Estimating weather + park factors...");
       await new Promise(r => setTimeout(r, 150));
       pushLog("🎲 Running 10,000-game Monte Carlo...");
       await new Promise(r => setTimeout(r, 150));
-      pushLog("🤖 Claude ranking HR candidates per game...");
 
-      const raw    = await callClaude(buildPrompt(games), 8000);
-      const parsed = grabJSON(raw);
-      const gameResults = parsed.games ?? [];
+      // Split into batches of 6 to avoid token limit
+      const BATCH = 6;
+      const allGameResults = [];
+      const batches = [];
+      for (let i = 0; i < games.length; i += BATCH) {
+        batches.push(games.slice(i, i + BATCH));
+      }
 
-      // Map results to game keys
+      for (let b = 0; b < batches.length; b++) {
+        pushLog("🤖 Analyzing batch " + (b + 1) + " of " + batches.length + " (" + batches[b].length + " games)...");
+        const raw    = await callClaude(buildPrompt(batches[b]), 8192);
+        const parsed = grabJSON(raw);
+        const batchResults = parsed.games ?? [];
+        allGameResults.push(...batchResults);
+        pushLog("✅ Batch " + (b + 1) + " done — " + batchResults.length + " games analyzed");
+      }
+
+      // Map all results to game keys
       const newResults = {};
-      gameResults.forEach(gr => {
+      allGameResults.forEach(gr => {
         const key = gr.away + gr.home;
         const players = (gr.players ?? []).sort((a, b) => (b.hrChancePct ?? 0) - (a.hrChancePct ?? 0));
         newResults[key] = { players };
@@ -559,7 +584,7 @@ export default function App() {
       // Auto-open all analyzed games
       setOpenGames(new Set(games.map(g => g.away + g.home)));
 
-      pushLog("✅ Done! " + gameResults.length + " games analyzed. Click any game to see HR %.");
+      pushLog("✅ All " + allGameResults.length + " games analyzed! Click any game to see HR %.");
       setPhase("done");
 
     } catch (e) {
