@@ -1,4 +1,4 @@
-"use client"
+"use client";
 import { useState, useEffect, useRef } from "react";
 
 /* ── Assets ── */
@@ -29,10 +29,12 @@ function useAssets() {
 }
 
 const T = {
-  bg:"#05080f", panel:"#0b1120", card:"#0d1428", border:"#1a2438",
-  accent:"#00d2ff", gold:"#ffd700", green:"#22c55e", red:"#f87171",
-  amber:"#facc15", purple:"#a78bfa", teal:"#2dd4bf",
-  text:"#dde6f0", muted:"#4a5a72", dim:"#111e30",
+  bg:"#080c14", panel:"#101826", card:"#131f2e", border:"#1e3048",
+  accent:"#00e5ff", gold:"#ffd700", green:"#00e676", red:"#ff5252",
+  amber:"#ffca28", purple:"#ce93d8", teal:"#40e0d0",
+  text:"#f0f6ff", muted:"#7a9abf", dim:"#0e1a28",
+  hotBg:"#1a2e1a", hotBorder:"#00e67655",
+  cardHover:"#162030",
 };
 const F = {
   bebas:"'Bebas Neue',Impact,sans-serif",
@@ -102,7 +104,7 @@ async function callClaude(text, maxTokens = 8000) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514", max_tokens: maxTokens,
+      model: "claude-sonnet-4-6", max_tokens: maxTokens,
       messages: [{ role: "user", content: [{ type: "text", text }] }],
     }),
   });
@@ -169,19 +171,20 @@ function Headshot({ mlbId, name, size = 56, teamColor = T.accent }) {
 
 /* ── HR Chance bar ── */
 function HRBar({ pct, color }) {
-  const c = pct >= 20 ? T.green : pct >= 12 ? T.amber : pct >= 6 ? T.gold : T.muted;
+  const c = pct >= 20 ? "#00e676" : pct >= 12 ? "#ffca28" : pct >= 6 ? "#ffa726" : "#7a9abf";
+  const glow = pct >= 20 ? "0 0 16px rgba(0,230,118,0.6)" : pct >= 12 ? "0 0 14px rgba(255,202,40,0.5)" : pct >= 6 ? "0 0 12px rgba(255,167,38,0.4)" : "none";
   return (
     <div style={{ flex: 1 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-        <span style={{ fontFamily: F.mono, fontSize: 9, color: T.muted }}>HR CHANCE</span>
-        <span style={{ fontFamily: F.arch, fontSize: 12, color: c }}>{pct.toFixed(1)}%</span>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+        <span style={{ fontFamily: F.mono, fontSize: 9, color: T.muted, letterSpacing: 1 }}>HR CHANCE</span>
+        <span style={{ fontFamily: F.arch, fontSize: 13, color: c, textShadow: glow }}>{pct.toFixed(1)}%</span>
       </div>
-      <div style={{ height: 6, background: T.dim, borderRadius: 3, overflow: "hidden" }}>
+      <div style={{ height: 7, background: "rgba(0,0,0,0.4)", borderRadius: 4, overflow: "hidden" }}>
         <div style={{
           height: "100%", width: pct + "%", maxWidth: "100%",
-          background: "linear-gradient(90deg," + c + "," + c + "99)",
-          borderRadius: 3, boxShadow: "0 0 8px " + c + "66",
-          transition: "width 1s cubic-bezier(.23,1,.32,1)",
+          background: "linear-gradient(90deg," + c + "," + c + "88)",
+          borderRadius: 4, boxShadow: glow,
+          transition: "width 1.1s cubic-bezier(.23,1,.32,1)",
         }} />
       </div>
     </div>
@@ -191,14 +194,16 @@ function HRBar({ pct, color }) {
 /* ── Player row inside game accordion ── */
 function PlayerRow({ p, rank, delay = 0 }) {
   const hrPct = p.hrChancePct ?? ((p.simHRs ?? 0) / 100);
-  const c = hrPct >= 20 ? T.green : hrPct >= 12 ? T.amber : hrPct >= 6 ? T.gold : T.muted;
+  const c = hrPct >= 20 ? "#00e676" : hrPct >= 12 ? "#ffca28" : hrPct >= 6 ? "#ffa726" : "#7a9abf";
+  const glow = hrPct >= 15 ? "0 0 20px " + c + "88" : "none";
   const [expanded, setExpanded] = useState(false);
 
   return (
     <div style={{
       animation: "hrs-up .35s ease " + delay + "ms both",
-      background: rank <= 3 ? c + "0a" : T.dim,
-      border: "1px solid " + (rank <= 3 ? c + "33" : T.border),
+      background: rank <= 3 ? c + "12" : "rgba(14,26,40,0.7)",
+      border: "1px solid " + (rank <= 3 ? c + "55" : T.border + "aa"),
+      boxShadow: rank === 1 ? "0 0 20px " + c + "22" : "none",
       borderRadius: 10, marginBottom: 7, overflow: "hidden",
     }}>
       {/* Main row */}
@@ -209,7 +214,7 @@ function PlayerRow({ p, rank, delay = 0 }) {
         {/* Rank */}
         <div style={{
           width: 22, flexShrink: 0, fontFamily: F.bebas, fontSize: 18,
-          color: rank === 1 ? T.gold : rank === 2 ? "#c0c0c0" : rank === 3 ? "#cd7f32" : T.muted,
+          color: rank === 1 ? "#ffd700" : rank === 2 ? "#e8e8e8" : rank === 3 ? "#ffaa44" : T.muted,
           textAlign: "center",
         }}>
           {rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : rank}
@@ -233,7 +238,7 @@ function PlayerRow({ p, rank, delay = 0 }) {
 
         {/* HR % big number */}
         <div style={{ textAlign: "right", flexShrink: 0 }}>
-          <div style={{ fontFamily: F.bebas, fontSize: 26, color: c, lineHeight: 1 }}>
+          <div style={{ fontFamily: F.bebas, fontSize: 28, color: c, lineHeight: 1, textShadow: glow }}>
             {hrPct.toFixed(1)}%
           </div>
           <div style={{ fontFamily: F.mono, fontSize: 8, color: T.muted }}>HR CHANCE</div>
@@ -246,9 +251,11 @@ function PlayerRow({ p, rank, delay = 0 }) {
       {/* Expanded detail */}
       {expanded && (
         <div style={{ padding: "0 12px 12px 12px", borderTop: "1px solid " + T.border }}>
-          <div style={{ marginTop: 10, display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+          <div style={{ marginTop: 10, display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
             {[
               ["vs", p.pitcher + " (" + p.pitcherHand + ") ERA " + (p.pitcherERA ?? "N/A"), T.amber],
+              ["WHIP", p.pitcherWhip ?? "-", p.pitcherWhip && p.pitcherWhip > 1.4 ? "#00e676" : T.text],
+              ["HA vs TEAM", p.hrAllowedVsTeam != null ? p.hrAllowedVsTeam + " HR" : "-", p.hrAllowedVsTeam > 2 ? "#00e676" : T.text],
               ["2026", (p.seasonHRs ?? "-") + " HR / " + (p.gamesPlayed ?? "-") + "g", T.accent],
               ["OPS", p.ops ?? "-", T.text],
               ["EV", p.exitVelo ? p.exitVelo + "mph" : "-", T.text],
@@ -267,17 +274,17 @@ function PlayerRow({ p, rank, delay = 0 }) {
           </div>
 
           {p.bvpSummary && (
-            <div style={{ fontFamily: F.mono, fontSize: 9, color: T.accent + "cc", background: T.accent + "0a", border: "1px solid " + T.accent + "22", borderRadius: 6, padding: "5px 8px", marginBottom: 5, lineHeight: 1.5 }}>
+            <div style={{ fontFamily: F.mono, fontSize: 9, color: T.accent + "cc", background: "rgba(0,229,255,0.08)", border: "1px solid rgba(0,229,255,0.3)", borderRadius: 6, padding: "5px 8px", marginBottom: 5, lineHeight: 1.5 }}>
               📊 {p.bvpSummary}
             </div>
           )}
           {p.homeAwaySplit && (
-            <div style={{ fontFamily: F.mono, fontSize: 9, color: T.green + "aa", background: T.green + "08", border: "1px solid " + T.green + "22", borderRadius: 6, padding: "5px 8px", marginBottom: 5, lineHeight: 1.5 }}>
+            <div style={{ fontFamily: F.mono, fontSize: 9, color: T.green + "aa", background: "rgba(0,230,118,0.07)", border: "1px solid rgba(0,230,118,0.25)", borderRadius: 6, padding: "5px 8px", marginBottom: 5, lineHeight: 1.5 }}>
               {p.isHome ? "🏠" : "✈"} {p.homeAwaySplit}
             </div>
           )}
           {p.weatherInsight && (
-            <div style={{ fontFamily: F.mono, fontSize: 9, color: T.green + "cc", background: T.green + "08", border: "1px solid " + T.green + "22", borderRadius: 6, padding: "5px 8px", lineHeight: 1.5 }}>
+            <div style={{ fontFamily: F.mono, fontSize: 9, color: T.green + "cc", background: "rgba(0,230,118,0.07)", border: "1px solid rgba(0,230,118,0.25)", borderRadius: 6, padding: "5px 8px", lineHeight: 1.5 }}>
               🌤 {p.weatherInsight}
             </div>
           )}
@@ -299,7 +306,8 @@ function GameCard({ game, result, isOpen, onToggle, onRemove, isRunning }) {
   return (
     <div style={{
       background: T.panel,
-      border: "1px solid " + (anyHot ? T.green + "33" : T.border),
+      border: "1px solid " + (anyHot ? T.green + "66" : T.border),
+      boxShadow: anyHot ? "0 0 16px rgba(0,230,118,0.08)" : "none",
       borderRadius: 12, marginBottom: 8, overflow: "hidden",
       animation: "hrs-up .3s ease both",
     }}>
@@ -309,51 +317,56 @@ function GameCard({ game, result, isOpen, onToggle, onRemove, isRunning }) {
         style={{
           padding: "11px 14px", cursor: "pointer",
           display: "flex", alignItems: "center", gap: 10,
-          background: isOpen ? T.dim : "transparent",
+          background: isOpen ? "rgba(14,28,42,0.9)" : "rgba(8,18,28,0.5)",
           userSelect: "none",
         }}
       >
-        {/* Teams */}
+        {/* Teams — stacked top/bottom layout */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
-            <span style={{ fontFamily: F.arch, fontSize: 14, color: T.text }}>
-              {game.away} <span style={{ color: T.muted, fontFamily: F.mono, fontSize: 10 }}>@</span> {game.home}
+          {/* Venue + time + badges */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 5 }}>
+            <span style={{ fontFamily: F.mono, fontSize: 9, color: T.muted }}>{game.venue} · {game.time}</span>
+            {anyHot && <span style={{ fontSize: 10 }}>🔥</span>}
+            {result && <span style={{ fontFamily: F.mono, fontSize: 8, color: "#00e676", background:"rgba(0,230,118,0.1)", padding:"1px 6px", borderRadius:4, border:"1px solid rgba(0,230,118,0.3)" }}>✅ analyzed</span>}
+          </div>
+          {/* Away team row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+            <span style={{ fontFamily: F.mono, fontSize: 9, color: T.teal, width: 18, flexShrink: 0 }}>✈</span>
+            <span style={{ fontFamily: F.arch, fontSize: 14, color: "#f4f9ff", minWidth: 36 }}>{game.away}</span>
+            <span style={{ fontFamily: F.mono, fontSize: 9, color: awayHot ? "#00e676" : T.muted }}>
+              {game.awayP} · {game.awayH} · ERA {eraDisplay(game.awayERA)}
+              {game.awayWhip ? " · WHIP " + game.awayWhip : ""}
+              {awayHot ? " 🔥" : ""}
             </span>
-            {anyHot && <span style={{ fontSize: 11 }}>🔥</span>}
-            {result && <span style={{ fontFamily: F.mono, fontSize: 9, color: T.green }}>✅ analyzed</span>}
           </div>
-          <div style={{ fontFamily: F.mono, fontSize: 9, color: T.muted }}>
-            {game.venue} · {game.time}
-          </div>
-          <div style={{ fontFamily: F.mono, fontSize: 8, color: T.muted, marginTop: 2 }}>
-            <span style={{ color: awayHot ? T.green : T.muted }}>✈ {game.awayP} ({game.awayH}) ERA {eraDisplay(game.awayERA)}</span>
-            <span style={{ color: T.border, margin: "0 6px" }}>·</span>
-            <span style={{ color: homeHot ? T.green : T.muted }}>🏠 {game.homeP} ({game.homeH}) ERA {eraDisplay(game.homeERA)}</span>
+          {/* Divider */}
+          <div style={{ height: 1, background: T.border + "66", marginLeft: 24, marginBottom: 4 }} />
+          {/* Home team row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontFamily: F.mono, fontSize: 9, color: T.green, width: 18, flexShrink: 0 }}>🏠</span>
+            <span style={{ fontFamily: F.arch, fontSize: 14, color: "#f4f9ff", minWidth: 36 }}>{game.home}</span>
+            <span style={{ fontFamily: F.mono, fontSize: 9, color: homeHot ? "#00e676" : T.muted }}>
+              {game.homeP} · {game.homeH} · ERA {eraDisplay(game.homeERA)}
+              {game.homeWhip ? " · WHIP " + game.homeWhip : ""}
+              {homeHot ? " 🔥" : ""}
+            </span>
           </div>
         </div>
 
         {/* Top HR % badge if analyzed */}
         {result && players[0] && (
           <div style={{ textAlign: "center", flexShrink: 0 }}>
-            <div style={{ fontFamily: F.bebas, fontSize: 20, color: T.gold, lineHeight: 1 }}>{topHR.toFixed(0)}%</div>
+            <div style={{ fontFamily: F.bebas, fontSize: 22, color: "#ffd700", lineHeight: 1, textShadow: "0 0 14px rgba(255,215,0,0.7)" }}>{topHR.toFixed(0)}%</div>
             <div style={{ fontFamily: F.mono, fontSize: 7, color: T.muted }}>TOP HR</div>
           </div>
         )}
 
-        {/* Remove + toggle */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-          <button
-            onClick={(e) => { e.stopPropagation(); onRemove(); }}
-            onMouseEnter={e => { e.currentTarget.style.color = T.red; }}
-            onMouseLeave={e => { e.currentTarget.style.color = T.muted; }}
-            style={{ background: "transparent", border: "none", color: T.muted, cursor: "pointer", fontSize: 13, padding: "2px 5px", borderRadius: 4 }}
-            title="Remove game"
-          >✕</button>
-          <div style={{
-            color: T.muted, fontSize: 11, transition: "transform .25s",
-            transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-          }}>▼</div>
-        </div>
+        {/* Toggle chevron only */}
+        <div style={{
+          color: T.accent, fontSize: 13, transition: "transform .25s",
+          transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+          flexShrink: 0, padding: "4px 6px",
+        }}>▼</div>
       </div>
 
       {/* Expanded content */}
@@ -452,9 +465,12 @@ function buildPrompt(games) {
     "For each player provide:",
     "- name, team, mlbId (MLBAM integer ID), emoji, teamColor (hex), isHome (bool)",
     "- hrChancePct: realistic HR probability % for today (0-35, most players 3-15%)",
-    "  Factor in: pitcher ERA, BvP, park factor, weather, platoon, current form",
-    "  High ERA pitcher + hitter-friendly park = higher %. Elite pitcher = lower %.",
-    "- pitcher, pitcherHand, pitcherERA, bvpSummary, homeAwaySplit, weatherInsight",
+    "  Factor in: pitcher ERA, WHIP, BvP, park factor, weather, platoon, current form",
+    "  High ERA/WHIP pitcher + hitter-friendly park = higher %. Elite pitcher = lower %.",
+    "- pitcher, pitcherHand, pitcherERA",
+    "- pitcherWhip: pitcher's 2026 WHIP (e.g. 1.24)",
+    "- hrAllowedVsTeam: how many HR this pitcher has allowed to THIS specific opposing team career/recent (integer, use best estimate)",
+    "- bvpSummary, homeAwaySplit, weatherInsight",
     "- seasonHRs, gamesPlayed, ops, exitVelo, parkFactor, simHRs (out of 10000), confidence",
     "",
     "Park HR factors: Coors=1.38 SutterHealth=1.28 Wrigley=1.14 Yankee=1.10 Fenway=1.06",
@@ -475,7 +491,7 @@ function buildPrompt(games) {
     "",
     '{"games":[{"away":"BAL","home":"NYY","venue":"Yankee Stadium","time":"1:35 PM ET",',
     '"players":[{"name":"Aaron Judge","team":"NYY","mlbId":592450,"emoji":"⚡","teamColor":"#003087",',
-    '"isHome":true,"hrChancePct":18.5,"pitcher":"Kyle Bradish","pitcherHand":"RHP","pitcherERA":4.20,',
+    '"isHome":true,"hrChancePct":18.5,"pitcher":"Kyle Bradish","pitcherHand":"RHP","pitcherERA":4.20,"pitcherWhip":1.28,"hrAllowedVsTeam":3,',
     '"bvpSummary":"4 career HR vs Bradish in 22 AB, .364 AVG","homeAwaySplit":"HOME: 1.042 OPS 8HR | ROAD: .898 OPS 4HR",',
     '"weatherInsight":"67F partly cloudy 14mph wind OUT to RF — Yankee short porch HR boost",',
     '"seasonHRs":12,"gamesPlayed":32,"ops":"1.052","exitVelo":"96.1","parkFactor":"1.10",',
@@ -493,7 +509,6 @@ export default function App() {
   const [logs,     setLogs]     = useState([]);
   const [results,  setResults]  = useState({});  // key: away+home → { players }
   const [errMsg,   setErrMsg]   = useState("");
-  const [confirm,  setConfirm]  = useState(false);
   const busy = useRef(false);
 
   const pushLog = msg => setLogs(p => [...p.slice(-12), msg]);
@@ -513,10 +528,7 @@ export default function App() {
     setOpenGames(prev => { const n = new Set(prev); n.delete(key); return n; });
   };
 
-  const clearAll = () => {
-    if (confirm) { setGames([]); setOpenGames(new Set()); setConfirm(false); }
-    else { setConfirm(true); setTimeout(() => setConfirm(false), 3000); }
-  };
+
 
   const restoreAll = () => {
     setGames([...ALL_GAMES]);
@@ -579,19 +591,19 @@ export default function App() {
 
       {/* HEADER */}
       <div style={{
-        background: "linear-gradient(180deg,#0d1728 0%," + T.bg + " 100%)",
+        background: "linear-gradient(180deg,#0a1628 0%,#0d1a30 50%," + T.bg + " 100%)",
         borderBottom: "1px solid " + T.border,
         padding: "18px 20px 12px", textAlign: "center",
         position: "relative", overflow: "hidden",
       }}>
-        <div style={{ position:"absolute", left:0, right:0, height:2, pointerEvents:"none", background:"linear-gradient(transparent,"+T.accent+"28,transparent)", animation:"hrs-scan 5s linear infinite" }} />
+        <div style={{ position:"absolute", left:0, right:0, height:2, pointerEvents:"none", background:"linear-gradient(transparent,"+T.accent+"55,transparent)", animation:"hrs-scan 5s linear infinite" }} />
         <div style={{ fontFamily:F.mono, fontSize:9, letterSpacing:6, color:T.accent, opacity:.6, marginBottom:3 }}>
           AI · MLB · HOME RUN INTELLIGENCE · MAY 3 2026
         </div>
         <div style={{ fontFamily:F.bebas, fontSize:40, letterSpacing:3, color:T.text, lineHeight:1, textShadow:"0 0 28px "+T.accent+"40" }}>
           ⚾ SPHRS
         </div>
-        <div style={{ fontFamily:F.mono, fontSize:10, color:T.muted, marginTop:3 }}>
+        <div style={{ fontFamily:F.mono, fontSize:10, color:"#8ab4d4", marginTop:3 }}>
           HR CHANCE % · PLAYER HEADSHOTS · GAME ACCORDIONS · 10,000× MONTE CARLO
         </div>
       </div>
@@ -608,10 +620,10 @@ export default function App() {
             {someRemoved && <span style={{ color:T.amber, marginLeft:8 }}>({ALL_GAMES.length - games.length} removed)</span>}
           </div>
           <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-            <button onClick={openAll} style={{ background:T.dim, color:T.muted, border:"1px solid "+T.border, borderRadius:6, padding:"4px 10px", fontFamily:F.mono, fontSize:9, cursor:"pointer" }}>↕ EXPAND ALL</button>
-            <button onClick={closeAll} style={{ background:T.dim, color:T.muted, border:"1px solid "+T.border, borderRadius:6, padding:"4px 10px", fontFamily:F.mono, fontSize:9, cursor:"pointer" }}>↕ COLLAPSE ALL</button>
+            <button onClick={openAll} style={{ background:"rgba(0,229,255,0.08)", color:T.accent, border:"1px solid "+T.accent+"44", borderRadius:6, padding:"4px 12px", fontFamily:F.mono, fontSize:9, cursor:"pointer" }}>↕ EXPAND ALL</button>
+            <button onClick={closeAll} style={{ background:"rgba(0,229,255,0.08)", color:T.accent, border:"1px solid "+T.accent+"44", borderRadius:6, padding:"4px 12px", fontFamily:F.mono, fontSize:9, cursor:"pointer" }}>↕ COLLAPSE ALL</button>
             {someRemoved && <button onClick={restoreAll} style={{ background:T.green+"18", color:T.green, border:"1px solid "+T.green+"44", borderRadius:6, padding:"4px 10px", fontFamily:F.mono, fontSize:9, cursor:"pointer" }}>↺ RESTORE ALL</button>}
-            {games.length > 0 && <button onClick={clearAll} style={{ background:confirm?T.red+"28":T.red+"10", color:confirm?T.red:T.muted, border:"1px solid "+(confirm?T.red+"55":T.muted+"25"), borderRadius:6, padding:"4px 10px", fontFamily:F.mono, fontSize:9, cursor:"pointer", animation:confirm?"hrs-shake .3s ease":"none" }}>{confirm ? "⚠️ CONFIRM" : "✕ CLEAR ALL"}</button>}
+
           </div>
         </div>
 
@@ -644,10 +656,11 @@ export default function App() {
         {(phase === "ready" || phase === "done") && games.length > 0 && (
           <div style={{ textAlign: "center", padding: "8px 0 16px" }}>
             <button onClick={run} style={{
-              background: "linear-gradient(135deg," + T.accent + ",#0099cc)",
-              color: T.bg, border: "none", borderRadius: 10,
-              padding: "13px 40px", fontFamily: F.arch, fontSize: 17,
-              cursor: "pointer", boxShadow: "0 0 28px " + T.accent + "44",
+              background: "linear-gradient(135deg,#00e5ff,#0066ff)",
+              color: "#050a14", border: "none", borderRadius: 12,
+              padding: "15px 44px", fontFamily: F.arch, fontSize: 18,
+              cursor: "pointer", boxShadow: "0 0 40px rgba(0,229,255,0.5), 0 4px 20px rgba(0,100,255,0.3)",
+              letterSpacing: 1,
             }}>
               {isDone ? "↺ RE-RUN ANALYSIS" : "▶ RUN ANALYSIS — " + games.length + " GAME" + (games.length !== 1 ? "S" : "")}
             </button>
@@ -687,7 +700,7 @@ export default function App() {
           )
         )}
 
-        <div style={{ textAlign:"center", fontFamily:F.mono, fontSize:9, color:"#111e2e", marginTop:8 }}>
+        <div style={{ textAlign:"center", fontFamily:F.mono, fontSize:9, color:"#2a4060", marginTop:8 }}>
           Claude AI · HR Chance % · Player Headshots · BvP · Weather · Park Factor · 10,000× Monte Carlo
         </div>
       </div>
