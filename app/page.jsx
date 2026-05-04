@@ -118,121 +118,179 @@ async function callClaude(text, maxTokens = 8192) {
 }
 
 
-/* ── Stadium coordinates for real weather ── */
+/* ── Stadium data: coordinates + home plate bearing ── */
+// cfBearing = compass direction home plate faces toward CF (outfield direction)
+// Wind FROM opposite of cfBearing = blowing OUT = HR boost
+// Wind FROM same as cfBearing    = blowing IN  = HR suppressor
 const STADIUM_COORDS = {
-  "Coors Field":         { lat: 39.7559, lon: -104.9942, dome: false },
-  "loanDepot Park":      { lat: 25.7781, lon: -80.2197,  dome: true  },
-  "Tropicana Field":     { lat: 27.7682, lon: -82.6534,  dome: true  },
-  "Comerica Park":       { lat: 42.3390, lon: -83.0485,  dome: false },
-  "Wrigley Field":       { lat: 41.9484, lon: -87.6553,  dome: false },
-  "Yankee Stadium":      { lat: 40.8296, lon: -73.9262,  dome: false },
-  "Kauffman Stadium":    { lat: 39.0517, lon: -94.4803,  dome: false },
-  "Busch Stadium":       { lat: 38.6226, lon: -90.1928,  dome: false },
-  "Daikin Park":         { lat: 29.7573, lon: -95.3555,  dome: true  },
-  "Angel Stadium":       { lat: 33.8003, lon: -117.8827, dome: false },
-  "T-Mobile Park":       { lat: 47.5914, lon: -122.3325, dome: true  },
-  "Oracle Park":         { lat: 37.7786, lon: -122.3893, dome: false },
-  "Petco Park":          { lat: 32.7076, lon: -117.1570, dome: false },
-  "Fenway Park":         { lat: 42.3467, lon: -71.0972,  dome: false },
-  "PNC Park":            { lat: 40.4469, lon: -80.0057,  dome: false },
-  "Great American":      { lat: 39.0979, lon: -84.5082,  dome: false },
-  "Nationals Park":      { lat: 38.8730, lon: -77.0074,  dome: false },
-  "Target Field":        { lat: 44.9817, lon: -93.2781,  dome: false },
-  "Sutter Health Park":  { lat: 38.5802, lon: -121.5005, dome: false },
-  "Truist Park":         { lat: 33.8907, lon: -84.4677,  dome: false },
-  "Globe Life Field":    { lat: 32.7512, lon: -97.0832,  dome: true  },
-  "Guaranteed Rate":     { lat: 41.8300, lon: -87.6339,  dome: false },
+  "Yankee Stadium":      { lat:40.8296, lon:-73.9262,  dome:false, cfBearing:221, plateFaces:"SW — RF short porch 314ft, LF 318ft" },
+  "Fenway Park":         { lat:42.3467, lon:-71.0972,  dome:false, cfBearing:95,  plateFaces:"E — Green Monster in LF 310ft, Pesky Pole RF 302ft" },
+  "Wrigley Field":       { lat:41.9484, lon:-87.6553,  dome:false, cfBearing:95,  plateFaces:"E — wind from Lake Michigan key factor" },
+  "Coors Field":         { lat:39.7559, lon:-104.9942, dome:false, cfBearing:335, plateFaces:"NNW — high altitude ball carries farther in all directions" },
+  "Oracle Park":         { lat:37.7786, lon:-122.3893, dome:false, cfBearing:315, plateFaces:"NW — McCovey Cove behind RF, bay breeze blows IN" },
+  "Petco Park":          { lat:32.7076, lon:-117.1570, dome:false, cfBearing:320, plateFaces:"NW — marine layer suppresses HRs, pitcher-friendly" },
+  "Angel Stadium":       { lat:33.8003, lon:-117.8827, dome:false, cfBearing:200, plateFaces:"SSW — RF 347ft, LF 347ft" },
+  "Kauffman Stadium":    { lat:39.0517, lon:-94.4803,  dome:false, cfBearing:30,  plateFaces:"NNE — open park, wind from SW blows OUT" },
+  "Busch Stadium":       { lat:38.6226, lon:-90.1928,  dome:false, cfBearing:315, plateFaces:"NW — symmetrical park, 400ft CF" },
+  "Comerica Park":       { lat:42.3390, lon:-83.0485,  dome:false, cfBearing:135, plateFaces:"SE — deep CF 420ft, pitcher-friendly dimensions" },
+  "PNC Park":            { lat:40.4469, lon:-80.0057,  dome:false, cfBearing:310, plateFaces:"WNW — Allegheny River behind RF, 325ft RF line" },
+  "Great American":      { lat:39.0979, lon:-84.5082,  dome:false, cfBearing:50,  plateFaces:"NE — hitter-friendly, Ohio River behind CF" },
+  "Nationals Park":      { lat:38.8730, lon:-77.0074,  dome:false, cfBearing:90, plateFaces:"E — Anacostia River, humid summers help carry" },
+  "Target Field":        { lat:44.9817, lon:-93.2781,  dome:false, cfBearing:340, plateFaces:"NNW — cold nights, wind from N blows out to RF" },
+  "Sutter Health Park":  { lat:38.5802, lon:-121.5005, dome:false, cfBearing:0,   plateFaces:"N — Sacramento heat, ball carries well in summer" },
+  "Truist Park":         { lat:33.8907, lon:-84.4677,  dome:false, cfBearing:300, plateFaces:"WNW — RF 325ft, compact park" },
+  "Guaranteed Rate":     { lat:41.8300, lon:-87.6339,  dome:false, cfBearing:130, plateFaces:"SE — open to lake winds" },
+  // Domes — orientation irrelevant
+  "Tropicana Field":     { lat:27.7682, lon:-82.6534,  dome:true },
+  "Daikin Park":         { lat:29.7573, lon:-95.3555,  dome:true },
+  "T-Mobile Park":       { lat:47.5914, lon:-122.3325, dome:true },
+  "loanDepot Park":      { lat:25.7781, lon:-80.2197,  dome:true },
+  "Globe Life Field":    { lat:32.7512, lon:-97.0832,  dome:true },
 };
 
 function windDegToDir(deg) {
   const dirs = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
-  return dirs[Math.round(deg / 22.5) % 16];
+  return dirs[Math.round(((deg % 360) + 360) / 22.5) % 16];
 }
 
 function wmoToCondition(code) {
-  if (code === 0)             return "Clear ☀️";
-  if (code <= 3)              return "Partly Cloudy ⛅";
-  if (code <= 48)             return "Foggy 🌫️";
-  if (code <= 67)             return "Rainy 🌧️";
-  if (code <= 77)             return "Snowy 🌨️";
-  if (code <= 82)             return "Showers 🌦️";
-  if (code <= 99)             return "Thunderstorms ⛈️";
+  if (code === 0)    return "Clear ☀️";
+  if (code <= 3)     return "Partly Cloudy ⛅";
+  if (code <= 48)    return "Foggy 🌫️";
+  if (code <= 67)    return "Rainy 🌧️";
+  if (code <= 77)    return "Snowy 🌨️";
+  if (code <= 82)    return "Showers 🌦️";
+  if (code <= 99)    return "Thunderstorms ⛈️";
   return "Cloudy ☁️";
 }
 
-/* Fetch real weather for all games in parallel */
+/* Parse game time string → UTC hour for the forecast
+   e.g. "7:05 PM ET" → 23 (ET = UTC-4 in May) */
+function gameTimeToUTCHour(timeStr) {
+  if (!timeStr) return null;
+  const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!match) return null;
+  let h = parseInt(match[1]);
+  const m = parseInt(match[2]);
+  const ampm = match[3].toUpperCase();
+  if (ampm === "PM" && h !== 12) h += 12;
+  if (ampm === "AM" && h === 12) h = 0;
+  // ET = UTC-4 in May (EDT). Add 4 to get UTC.
+  return (h + 4) % 24;
+}
+
+/* Assess wind direction relative to home plate orientation */
+function assessWindVsField(windDeg, cfBearing) {
+  if (cfBearing == null) return { label: "unknown", boost: 0 };
+  // Angle between wind direction (where wind goes, not comes from)
+  // Wind direction in meteo = where wind comes FROM
+  // Wind "going toward" = windDeg + 180
+  const windGoingDeg = (windDeg + 180) % 360;
+  const diff = Math.abs(((windGoingDeg - cfBearing + 540) % 360) - 180);
+
+  // diff = 0 → wind blowing perfectly toward CF (OUT = HR boost)
+  // diff = 180 → wind blowing from CF toward home plate (IN = suppressor)
+  if (diff <= 45)  return { label: "OUT to CF 🚀",   boost: 1  };
+  if (diff <= 90)  return { label: "Out to corner",   boost: 0.5 };
+  if (diff >= 135) return { label: "IN from CF 🛑",   boost: -1 };
+  if (diff >= 90)  return { label: "crosswind",       boost: 0  };
+  return { label: "neutral", boost: 0 };
+}
+
+/* Fetch real weather at GAME TIME for all games in parallel */
 async function fetchWeatherForGames(games) {
   const weatherMap = {};
-  
+
   await Promise.all(games.map(async (g) => {
-    const key = g.away + g.home;
+    const key    = g.away + g.home;
     const coords = STADIUM_COORDS[g.venue];
-    
-    if (!coords) {
-      weatherMap[key] = null;
-      return;
-    }
+
+    if (!coords) { weatherMap[key] = null; return; }
 
     if (coords.dome) {
       weatherMap[key] = {
-        condition: "Dome — climate controlled 🏠",
-        tempF: 72,
-        windSpeed: 0,
-        windDir: "N/A",
-        windDeg: 0,
-        isOutdoor: false,
-        hrImpact: "neutral",
-        summary: "Indoor dome — no weather impact on HR",
+        condition: "Dome 🏠", tempF: 72, windSpeed: 0, windDir: "N/A", windDeg: 0,
+        isOutdoor: false, hrImpact: "neutral",
+        plateFaces: "Indoor dome — no wind factor",
+        windVsField: "N/A",
+        summary: "Indoor dome — climate controlled, no weather impact",
       };
       return;
     }
 
     try {
+      const gameUTCHour = gameTimeToUTCHour(g.time);
+
+      // Use hourly forecast to get weather at actual game time
       const url = "https://api.open-meteo.com/v1/forecast" +
         "?latitude=" + coords.lat +
         "&longitude=" + coords.lon +
+        "&hourly=temperature_2m,windspeed_10m,winddirection_10m,weathercode" +
         "&current=temperature_2m,windspeed_10m,winddirection_10m,weathercode" +
-        "&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto";
-      
+        "&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=UTC&forecast_days=1";
+
       const r = await fetch(url);
       const d = await r.json();
-      const cur = d.current;
 
-      const tempF    = Math.round(cur.temperature_2m);
-      const windSpd  = Math.round(cur.windspeed_10m);
-      const windDeg  = cur.winddirection_10m;
-      const windDir  = windDegToDir(windDeg);
-      const condition = wmoToCondition(cur.weathercode);
-
-      // HR impact assessment
-      let hrImpact = "neutral";
-      let impactNote = "";
-      if (cur.weathercode >= 51) {
-        hrImpact = "negative";
-        impactNote = "Rain may suppress HR";
-      } else if (windSpd >= 12 && (windDeg >= 315 || windDeg <= 45 || (windDeg >= 45 && windDeg <= 135))) {
-        hrImpact = "positive";
-        impactNote = windSpd + "mph wind blowing OUT — HR boost";
-      } else if (windSpd >= 12) {
-        hrImpact = "negative";
-        impactNote = windSpd + "mph wind blowing IN — HR suppressor";
-      } else if (tempF >= 80) {
-        hrImpact = "positive";
-        impactNote = "Hot " + tempF + "°F — ball carries well";
-      } else if (tempF <= 45) {
-        hrImpact = "negative";
-        impactNote = "Cold " + tempF + "°F — dead ball conditions";
+      // Pick the right hour from forecast if we can, else fall back to current
+      let tempF, windSpd, windDeg, wcode;
+      if (gameUTCHour !== null && d.hourly?.time) {
+        const hourIdx = d.hourly.time.findIndex(t => new Date(t).getUTCHours() === gameUTCHour);
+        if (hourIdx >= 0) {
+          tempF   = Math.round(d.hourly.temperature_2m[hourIdx]);
+          windSpd = Math.round(d.hourly.windspeed_10m[hourIdx]);
+          windDeg = d.hourly.winddirection_10m[hourIdx];
+          wcode   = d.hourly.weathercode[hourIdx];
+        }
+      }
+      // Fallback to current if hourly lookup failed
+      if (tempF == null) {
+        tempF   = Math.round(d.current.temperature_2m);
+        windSpd = Math.round(d.current.windspeed_10m);
+        windDeg = d.current.winddirection_10m;
+        wcode   = d.current.weathercode;
       }
 
+      const windDir   = windDegToDir(windDeg);
+      const condition = wmoToCondition(wcode);
+      const fieldAssess = assessWindVsField(windDeg, coords.cfBearing);
+
+      // HR impact
+      let hrImpact = "neutral";
+      let impactNote = "";
+      if (wcode >= 51) {
+        hrImpact = "negative";
+        impactNote = "Rain/storms suppress HR";
+      } else if (windSpd >= 10) {
+        if (fieldAssess.boost >= 1) {
+          hrImpact = "positive";
+          impactNote = windSpd + "mph wind " + fieldAssess.label + " — HR boost";
+        } else if (fieldAssess.boost <= -1) {
+          hrImpact = "negative";
+          impactNote = windSpd + "mph wind " + fieldAssess.label + " — HR suppressed";
+        } else {
+          impactNote = windSpd + "mph " + fieldAssess.label;
+        }
+      } else if (tempF >= 82) {
+        hrImpact = "positive";
+        impactNote = "Heat " + tempF + "°F — ball carries";
+      } else if (tempF <= 46) {
+        hrImpact = "negative";
+        impactNote = "Cold " + tempF + "°F — dead ball";
+      }
+
+      const plateFaces = coords.plateFaces || "facing " + windDegToDir(coords.cfBearing ?? 0);
+
       weatherMap[key] = {
-        condition,
-        tempF,
-        windSpeed: windSpd,
-        windDir,
-        windDeg,
-        isOutdoor: true,
-        hrImpact,
-        summary: tempF + "°F · " + condition + " · Wind " + windSpd + "mph " + windDir + (impactNote ? " · " + impactNote : ""),
+        condition, tempF, windSpeed: windSpd, windDir, windDeg,
+        isOutdoor: true, hrImpact,
+        plateFaces,
+        windVsField: fieldAssess.label,
+        fieldBoost: fieldAssess.boost,
+        summary: tempF + "°F · " + condition + " · " + windSpd + "mph from " + windDir +
+          " (" + fieldAssess.label + ")" +
+          (impactNote ? " · " + impactNote : ""),
+        gameTime: g.time,
       };
     } catch (_) {
       weatherMap[key] = null;
@@ -635,16 +693,18 @@ function buildPrompt(games, weatherMap = {}) {
     "TODAY'S GAMES (with REAL live weather data fetched from weather API):",
     lines,
     "",
-    "REAL WEATHER CONDITIONS RIGHT NOW (use these exact values for weatherInsight):",
+    "REAL WEATHER AT GAME TIME (use these exact values for weatherInsight — include temp, wind vs field direction, HR impact):",
     ...games.map(g => {
       const key = g.away + g.home;
       const w = weatherMap[key];
-      if (!w) return g.away + "@" + g.home + ": Weather unavailable — estimate based on city/season";
-      return g.away + "@" + g.home + " at " + g.venue + ": " + w.summary +
+      if (!w) return g.away + "@" + g.home + ": Weather unavailable — estimate based on season";
+      const plateNote = w.plateFaces ? " | Home plate faces: " + w.plateFaces : "";
+      const timeNote  = " | Forecast for game time: " + g.time;
+      return g.away + "@" + g.home + " at " + g.venue + ": " + w.summary + plateNote + timeNote +
         (w.hrImpact === "positive" ? " ✅ HR FAVORABLE" : w.hrImpact === "negative" ? " ❌ HR UNFAVORABLE" : " ➡️ NEUTRAL");
     }),
     "",
-    "TASK: For EACH game return the top 3 HR candidates only from the TWO TEAMS in THAT specific game.",
+    "TASK: For EACH game return exactly 5 HR candidates from the TWO TEAMS in THAT specific game (mix from both teams, best HR spots first).",
     "CRITICAL: ONLY include POSITION PLAYERS (batters). NEVER include pitchers as HR candidates.",
     "CRITICAL: Every player MUST play for either the away team OR the home team of their specific game. No cross-game players.",
     "Do NOT list any starting pitcher, relief pitcher, or anyone listed as SP/RP/LHP/RHP as a batter.",
@@ -654,7 +714,7 @@ function buildPrompt(games, weatherMap = {}) {
     "For each player provide (be concise):",
     "- name, team, mlbId, emoji, teamColor, isHome",
     "- hrChancePct (0-35), pitcher, pitcherHand, pitcherERA, pitcherWhip, hrAllowedVsTeam",
-    "- bvpSummary (1 sentence), homeAwaySplit (1 line), weatherInsight (1 sentence)",
+    "- bvpSummary (1 sentence), homeAwaySplit (1 line), weatherInsight: cite the REAL weather data — temp°F, wind mph blowing OUT/IN/crosswind relative to the field, and HR impact rating",
     "- seasonHRs: player actual 2026 home run total as of today (integer, e.g. 8 not null), gamesPlayed, ops, exitVelo, parkFactor",
     "- simHRs: how many times out of 10000 simulated games this batter hits a HR off this specific pitcher today (integer 0-10000)",
     "- hotStreak: how many HR in the player's last 7 days/10 games (integer, 0 if none, e.g. 3 means 3 HR in last 10 games)",
