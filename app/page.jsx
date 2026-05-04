@@ -1,4 +1,3 @@
-"use client";
 import { useState, useEffect, useRef } from "react";
 
 /* ── Assets ── */
@@ -16,10 +15,11 @@ function useAssets() {
       s.textContent = [
         "@keyframes hrs-spin{to{transform:rotate(360deg)}}",
         "@keyframes hrs-up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}",
-        "@keyframes hrs-pop{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}",
+        "@keyframes hrs-pop{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}",
         "@keyframes hrs-blink{0%,100%{opacity:1}50%{opacity:.3}}",
         "@keyframes hrs-glow{0%,100%{box-shadow:0 0 12px rgba(0,210,255,.1)}50%{box-shadow:0 0 30px rgba(0,210,255,.3)}}",
         "@keyframes hrs-scan{0%{top:-3px;opacity:.5}100%{top:100%;opacity:0}}",
+        "@keyframes hrs-bar{from{width:0}to{width:var(--w)}}",
         "@keyframes hrs-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}",
       ].join("");
       document.head.appendChild(s);
@@ -39,6 +39,7 @@ const F = {
   arch:"'Archivo Black','Arial Black',sans-serif",
 };
 
+/* ── All 15 games ── */
 const ALL_GAMES = [
   { away:"TOR", home:"MIN", venue:"Target Field",        city:"Minneapolis",    st:"MN", time:"12:45 PM ET",
     awayP:"Trey Yesavage",    awayH:"RHP", awayERA:0.00,  awayRec:"1-0",
@@ -87,653 +88,607 @@ const ALL_GAMES = [
     homeP:"Tyler Holton",     homeH:"LHP", homeERA:5.54,  homeRec:"0-1" },
 ];
 
-/* ── Claude API — hits our own secure backend route ── */
+/* ── Claude API ── */
 class RateLimitError extends Error {
   constructor(resetTime, resetsAt) {
     super("RATE_LIMIT:" + resetTime + ":" + (resetsAt || 0));
-    this.isRateLimit = true;
-    this.resetTime = resetTime;
-    this.resetsAt = resetsAt;
+    this.isRateLimit = true; this.resetTime = resetTime; this.resetsAt = resetsAt;
   }
 }
 
-async function callClaude(text) {
-  const r = await fetch("/api/claude", {
+async function callClaude(text, maxTokens = 8000) {
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514", max_tokens: maxTokens,
+      messages: [{ role: "user", content: [{ type: "text", text }] }],
+    }),
   });
   const d = await r.json();
-  if (d.type === "exceeded_limit" || (d.error && d.error.type === "exceeded_limit")) {
-    const resetsAt = d.resetsAt || d.error?.resetsAt;
-    const resetStr = resetsAt
-      ? new Date(resetsAt * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-      : "soon";
-    throw new RateLimitError(resetStr, resetsAt);
+  if (d.type === "exceeded_limit" || d.error?.type === "exceeded_limit") {
+    const ra = d.resetsAt || d.error?.resetsAt;
+    throw new RateLimitError(ra ? new Date(ra * 1000).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" }) : "soon", ra);
   }
-  if (d.error) {
-    if (d.error.message?.includes("exceeded_limit")) throw new RateLimitError("soon", null);
-    throw new Error(d.error.message || JSON.stringify(d.error));
-  }
+  if (d.error) throw new Error(d.error.message || JSON.stringify(d.error));
   return d.content.map(b => b.text || "").join("").trim();
 }
 
 /* ── JSON helpers ── */
-function sanitizeJSON(s) {
-  s = s.replace(/\u201c|\u201d/g, '"');
-  s = s.replace(/\u2018|\u2019/g, "'");
+function sanitize(s) {
+  s = s.replace(/\u201c|\u201d/g, '"').replace(/\u2018|\u2019/g, "'");
   s = s.replace(/'([A-Za-z_][A-Za-z0-9_]{0,50})['"]\s*:/g, '"$1":');
   s = s.replace(/"([A-Za-z_][A-Za-z0-9_]{0,50})'\s*:/g, '"$1":');
-  s = s.replace(/,(\s*[}\]])/g, '$1');
-  s = s.replace(/:\s*True\b/g, ': true');
-  s = s.replace(/:\s*False\b/g, ': false');
-  s = s.replace(/:\s*None\b/g, ': null');
-  s = s.replace(/:\s*undefined\b/g, ': null');
+  s = s.replace(/,(\s*[}\]])/g, "$1");
+  s = s.replace(/:\s*True\b/g, ": true").replace(/:\s*False\b/g, ": false").replace(/:\s*None\b/g, ": null");
   return s;
 }
-
 function grabJSON(raw) {
   let s = raw.replace(/```json\s*/gi, "").replace(/```\s*/gi, "").trim();
   const oa = s.indexOf("{"), ob = s.indexOf("[");
-  const start = oa === -1 ? ob : ob === -1 ? oa : Math.min(oa, ob);
-  if (start === -1) throw new Error("No JSON found");
-  const isObj = s[start] === "{";
-  const end = isObj ? s.lastIndexOf("}") : s.lastIndexOf("]");
-  if (end === -1) throw new Error("No closing bracket");
-  const slice = s.slice(start, end + 1);
+  const st = oa === -1 ? ob : ob === -1 ? oa : Math.min(oa, ob);
+  if (st === -1) throw new Error("No JSON found");
+  const end = s[st] === "{" ? s.lastIndexOf("}") : s.lastIndexOf("]");
+  const slice = s.slice(st, end + 1);
   try { const p = JSON.parse(slice); if (p && typeof p === "object") return p; } catch (_) {}
-  const clean = sanitizeJSON(slice);
+  const clean = sanitize(slice);
   try { const p = JSON.parse(clean); if (p && typeof p === "object") return p; } catch (_) {}
-  try {
-    const fixed = clean.replace(/([{,\[\s\n:])'([^'\n]*?)'/g, '$1"$2"');
-    const p = JSON.parse(sanitizeJSON(fixed));
-    if (p && typeof p === "object") return p;
-  } catch (_) {}
-  const m = clean.match(/"players"\s*:\s*(\[[\s\S]*\])/);
-  if (m) {
-    try { return { players: JSON.parse(m[1]) }; } catch (_) {}
-    try { return { players: JSON.parse(sanitizeJSON(m[1])) }; } catch (_) {}
+  const m = clean.match(/"games"\s*:\s*(\[[\s\S]*\])/);
+  if (m) { try { return { games: JSON.parse(m[1]) }; } catch (_) {} }
+  throw new Error("JSON parse failed: " + slice.slice(0, 150));
+}
+
+/* ── Player headshot ── */
+function Headshot({ mlbId, name, size = 56, teamColor = T.accent }) {
+  const [err, setErr] = useState(false);
+  const initials = (name || "??").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  if (!mlbId || err) {
+    return (
+      <div style={{
+        width: size, height: size, borderRadius: "50%", flexShrink: 0,
+        background: teamColor + "22", border: "2px solid " + teamColor + "55",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontFamily: F.arch, fontSize: size * 0.3, color: teamColor,
+      }}>{initials}</div>
+    );
   }
-  throw new Error("JSON parse failed. Got: " + slice.slice(0, 200));
-}
-
-/* ── Roster facts ── */
-const ROSTER_FACTS = [
-  "Pete Alonso signed with BAL (Orioles) in 2025 offseason — NOT on NYM",
-  "Juan Soto signed with NYM (Mets) — NOT on NYY",
-  "Cody Bellinger is on NYY (Yankees)",
-  "Max Fried signed with NYY (Yankees)",
-  "Shohei Ohtani is on LAD (Dodgers)",
-  "Yordan Alvarez is on HOU (Astros)",
-  "Aaron Judge is on NYY (Yankees)",
-  "Gunnar Henderson is on BAL (Orioles)",
-  "Matt Olson is on ATL (Braves)",
-  "Kyle Schwarber is on PHI (Phillies)",
-  "Bryce Harper is on PHI (Phillies)",
-  "Freddie Freeman is on LAD (Dodgers)",
-  "Mookie Betts is on LAD (Dodgers)",
-  "Fernando Tatis Jr. is on SD (Padres)",
-  "Munetaka Murakami is on CWS (White Sox)",
-  "Rafael Devers is on SF (Giants) — traded from BOS",
-  "Willy Adames is on SF (Giants) — signed from MIL",
-  "Byron Buxton is on MIN (Twins)",
-  "Jose Ramirez is on CLE (Guardians)",
-  "Bobby Witt Jr. is on KC (Royals)",
-  "Julio Rodriguez is on SEA (Mariners)",
-  "Randy Arozarena is on SEA (Mariners) — traded from TB",
-  "Shea Langeliers is on ATH (Athletics)",
-  "Nick Kurtz is on ATH (Athletics)",
-  "James Wood is on WSH (Nationals)",
-  "CJ Abrams is on WSH (Nationals)",
-  "Mike Trout is on LAA (Angels)",
-  "Junior Caminero is on TB (Rays)",
-  "Elly De La Cruz is on CIN (Reds)",
-  "Paul Goldschmidt is on NYY (Yankees) — signed in offseason",
-  "Nolan Arenado is on STL (Cardinals)",
-  "Adolis Garcia is on TEX (Rangers)",
-  "Jordan Walker is on STL (Cardinals)",
-  "Spencer Torkelson is on DET (Tigers)",
-  "Riley Greene is on DET (Tigers)",
-  "Kerry Carpenter is on DET (Tigers)",
-  "Vinnie Pasquantino is on KC (Royals)",
-  "Salvador Perez is on KC (Royals)",
-  "Vladimir Guerrero Jr. is on TOR (Blue Jays)",
-  "Bo Bichette is on TOR (Blue Jays)",
-  "William Contreras is on MIL (Brewers)",
-  "Jackson Chourio is on MIL (Brewers)",
-  "Nathaniel Lowe is on TEX (Rangers)",
-  "Ezequiel Tovar is on COL (Rockies)",
-  "Ketel Marte is on AZ (D-backs)",
-  "Corbin Carroll is on AZ (D-backs)",
-  "Francisco Lindor is on NYM (Mets)",
-  "Ian Happ is on CHC (Cubs)",
-  "Pete Crow-Armstrong is on CHC (Cubs)",
-  "Alex Bregman is on BOS (Red Sox) — signed from HOU",
-  "Jarren Duran is on BOS (Red Sox)",
-  "Matt Chapman is on SF (Giants)",
-  "Oneil Cruz is on PIT (Pirates)",
-];
-
-function buildPrompt(games) {
-  const eraStr = (era) => era === null || era === undefined ? "N/A" : String(era);
-  const lines = games.map(g =>
-    g.away + "@" + g.home + " | " + g.venue + " | " + g.city + " " + g.st + " | " + g.time +
-    " | Away SP: " + g.awayP + " " + g.awayH + " ERA " + eraStr(g.awayERA) + " " + g.awayRec +
-    " | Home SP: " + g.homeP + " " + g.homeH + " ERA " + eraStr(g.homeERA) + " " + g.homeRec
-  ).join("\n");
-  const rosterFacts = ROSTER_FACTS.join("\n  - ");
-  const jsonRules = "CRITICAL JSON RULES:\n1. Use ONLY double-quotes. Never single quotes.\n2. Start with { end with }. No other text.\n3. No trailing commas.";
-  const schema = '{"players":[{"name":"Matt Olson","team":"ATL","emoji":"🪓","teamColor":"#CE1141","isHome":false,"gameTime":"3:10 PM ET","isDaytime":true,"isOpenAir":true,"venue":"Coors Field","pitcher":"Kyle Freeland","pitcherHand":"LHP","pitcherERA":3.48,"pitcherRecord":"1-2","bvpSummary":"4 HR vs Freeland in 18 AB .389 AVG .722 SLG","homeAwaySplit":"HOME: .330/.420/.640 8HR | ROAD: .280/.370/.560 4HR","weatherInsight":"Denver 72F 12mph wind OUT to CF","dayNightInsight":"Day game Olson day OPS .980 vs night .870","stadiumInsight":"Coors Field open air park factor 1.38","seasonHRs":10,"gamesPlayed":34,"ops":"1.020","exitVelo":"93.4","barrelPct":"17.1","parkFactor":"1.38","splitOPS":".980","homeOPS":".950","awayOPS":"1.020","homeHR":6,"awayHR":4,"simHRs":3200,"confidence":88}],"weatherSummary":[{"venue":"Coors Field","condition":"Partly Cloudy","tempF":72,"windSpeed":12,"windDir":"Out to CF","isOpenAir":true,"isDaytime":true}]}';
-  return [
-    "You are an elite MLB home run prop analyst with complete knowledge of 2026 MLB rosters and stats.",
-    "Today is Sunday May 3 2026.",
-    "",
-    "CRITICAL ROSTER ACCURACY:",
-    "  - " + rosterFacts,
-    "NEVER put a player on a team they do not play for in 2026.",
-    "",
-    "TODAY'S GAMES (" + games.length + " selected):",
-    lines,
-    "",
-    "NOTABLE MATCHUPS:",
-    "- AZ@CHC: Merrill Kelly 9.20 ERA vs Matthew Boyd 7.00 ERA at Wrigley",
-    "- MIL@WSH: Zack Littell 7.85 ERA (0-4) — very hittable",
-    "- PHI@MIA: Luzardo 5.50 ERA vs Paddack 6.11 ERA (0-4)",
-    "- ATL@COL: Strider returning at Coors Field (park factor 1.38)",
-    "- KC@SEA: Luis Castillo 6.35 ERA struggling",
-    "- TEX@DET: Leiter 5.17 ERA vs Holton 5.54 ERA",
-    "",
-    "TASK: Pick the best HR candidate from each game. Return the TOP 10 ranked by confidence.",
-    "",
-    "For EVERY player include: name, team, emoji, teamColor, isHome, gameTime, isDaytime, isOpenAir, venue, pitcher, pitcherHand, pitcherERA, pitcherRecord, bvpSummary, homeAwaySplit, weatherInsight, dayNightInsight, stadiumInsight, seasonHRs, gamesPlayed, ops, exitVelo, barrelPct, parkFactor, splitOPS, homeOPS, awayOPS, homeHR, awayHR, simHRs (out of 10000), confidence (0-100)",
-    "",
-    "Park factors: Coors=1.38 SutterHealth=1.28 Wrigley=1.14 Yankee=1.10 Fenway=1.06 Angel=1.02 Target=1.02 Busch=1.01 Comerica=1.00 Nationals=1.00 loanDepot=0.95 Tropicana=0.94 PNC=0.90 Petco=0.88 TMobile=0.85",
-    "",
-    jsonRules,
-    "",
-    schema,
-  ].join("\n");
-}
-
-/* ════════ UI Components ════════ */
-
-function Spin({ size = 18, color = T.accent }) {
-  return <div style={{ width:size, height:size, flexShrink:0, border:"2px solid "+color+"25", borderTopColor:color, borderRadius:"50%", animation:"hrs-spin .75s linear infinite", display:"inline-block" }} />;
-}
-function Tag({ ch, color = T.accent }) {
-  return <span style={{ fontFamily:F.mono, fontSize:9, letterSpacing:1, padding:"2px 6px", borderRadius:4, whiteSpace:"nowrap", background:color+"18", border:"1px solid "+color+"40", color }}>{ch}</span>;
-}
-function Pill({ label, value, hi, color }) {
-  const c = color || (hi ? T.gold : null);
-  return <div style={{ fontFamily:F.mono, fontSize:9, padding:"2px 7px", borderRadius:5, background:c?c+"14":T.dim, border:"1px solid "+(c?c+"40":T.border), display:"flex", gap:4, alignItems:"center" }}>
-    <span style={{ color:T.muted }}>{label}</span>
-    <span style={{ color:c||T.text, fontWeight:600 }}>{value}</span>
-  </div>;
-}
-function Insight({ icon, text, color }) {
-  if (!text) return null;
-  return <div style={{ fontFamily:F.mono, fontSize:10, lineHeight:1.55, background:color+"0c", border:"1px solid "+color+"25", borderRadius:7, padding:"5px 10px", marginBottom:5, color:color+"cc" }}>{icon} {text}</div>;
-}
-function HomeAwaySplit({ p }) {
-  if (!p.homeAwaySplit && !p.homeOPS && !p.awayOPS) return null;
-  const isHome = p.isHome;
   return (
-    <div style={{ background:T.dim, border:"1px solid "+T.border, borderRadius:8, padding:"8px 10px", marginBottom:5 }}>
-      <div style={{ fontFamily:F.mono, fontSize:9, color:T.muted, letterSpacing:1, marginBottom:6 }}>
-        HOME / AWAY SPLITS 2026 — {isHome ? "PLAYING AT HOME TODAY 🏠" : "ON THE ROAD TODAY ✈"}
+    <img
+      src={"https://img.mlb.com/headshots/current/60x60/" + mlbId + ".jpg"}
+      alt={name}
+      onError={() => setErr(true)}
+      style={{
+        width: size, height: size, borderRadius: "50%", flexShrink: 0,
+        objectFit: "cover", border: "2px solid " + teamColor + "55",
+        background: T.dim,
+      }}
+    />
+  );
+}
+
+/* ── HR Chance bar ── */
+function HRBar({ pct, color }) {
+  const c = pct >= 20 ? T.green : pct >= 12 ? T.amber : pct >= 6 ? T.gold : T.muted;
+  return (
+    <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+        <span style={{ fontFamily: F.mono, fontSize: 9, color: T.muted }}>HR CHANCE</span>
+        <span style={{ fontFamily: F.arch, fontSize: 12, color: c }}>{pct.toFixed(1)}%</span>
       </div>
-      <div style={{ display:"flex", gap:8 }}>
-        <div style={{ flex:1, borderRadius:6, padding:"6px 9px", background:isHome?T.green+"14":T.dim, border:"1px solid "+(isHome?T.green+"40":T.border) }}>
-          <div style={{ fontFamily:F.mono, fontSize:8, color:isHome?T.green:T.muted, marginBottom:3, letterSpacing:1 }}>🏠 HOME {isHome?"← TODAY":""}</div>
-          <div style={{ display:"flex", gap:5, flexWrap:"wrap" }}>
-            <Pill label="OPS" value={p.homeOPS||"—"} color={isHome?T.green:null} />
-            <Pill label="HR"  value={p.homeHR!=null?p.homeHR:"—"} color={isHome?T.green:null} />
-          </div>
-        </div>
-        <div style={{ flex:1, borderRadius:6, padding:"6px 9px", background:!isHome?T.teal+"14":T.dim, border:"1px solid "+(!isHome?T.teal+"40":T.border) }}>
-          <div style={{ fontFamily:F.mono, fontSize:8, color:!isHome?T.teal:T.muted, marginBottom:3, letterSpacing:1 }}>✈ AWAY {!isHome?"← TODAY":""}</div>
-          <div style={{ display:"flex", gap:5, flexWrap:"wrap" }}>
-            <Pill label="OPS" value={p.awayOPS||"—"} color={!isHome?T.teal:null} />
-            <Pill label="HR"  value={p.awayHR!=null?p.awayHR:"—"} color={!isHome?T.teal:null} />
-          </div>
-        </div>
+      <div style={{ height: 6, background: T.dim, borderRadius: 3, overflow: "hidden" }}>
+        <div style={{
+          height: "100%", width: pct + "%", maxWidth: "100%",
+          background: "linear-gradient(90deg," + c + "," + c + "99)",
+          borderRadius: 3, boxShadow: "0 0 8px " + c + "66",
+          transition: "width 1s cubic-bezier(.23,1,.32,1)",
+        }} />
       </div>
-      {p.homeAwaySplit && <div style={{ fontFamily:F.mono, fontSize:9, color:(isHome?T.green:T.teal)+"aa", marginTop:5, lineHeight:1.4 }}>{p.homeAwaySplit}</div>}
     </div>
   );
 }
 
-/* ── Strike Zone ── */
-function zoneColor(grade) {
-  if (grade==="hot")     return { bg:"#7f0000", border:"#ff4444", text:"#ffaaaa" };
-  if (grade==="warm")    return { bg:"#7f3500", border:"#ff8800", text:"#ffcc88" };
-  if (grade==="neutral") return { bg:"#1e2a3a", border:"#2a3a50", text:"#8a9ab0" };
-  if (grade==="cool")    return { bg:"#003060", border:"#0066cc", text:"#66aaff" };
-  if (grade==="cold")    return { bg:"#001840", border:"#0033aa", text:"#4466cc" };
-  return                        { bg:"#111e30", border:"#1a2438", text:"#4a5a72" };
-}
-function ZoneCell({ zone, isChase }) {
-  if (!zone) return <div style={{ flex:1, minHeight:isChase?26:52 }} />;
-  const col = zoneColor(zone.grade);
-  const freq = zone.pitcherFreq ?? 0;
-  const dotSize = Math.round(6 + freq * 22);
-  const dotOpacity = freq > 0 ? Math.min(0.2 + freq * 2.5, 1.0) : 0;
+/* ── Player row inside game accordion ── */
+function PlayerRow({ p, rank, delay = 0 }) {
+  const hrPct = p.hrChancePct ?? ((p.simHRs ?? 0) / 100);
+  const c = hrPct >= 20 ? T.green : hrPct >= 12 ? T.amber : hrPct >= 6 ? T.gold : T.muted;
+  const [expanded, setExpanded] = useState(false);
+
   return (
-    <div title={zone.label+"\nAVG "+(zone.avg||"-")+"  SLG "+(zone.slg||"-")+"\nPitcher freq: "+Math.round(freq*100)+"%"}
-      style={{ flex:1, minHeight:isChase?26:52, background:col.bg, border:"1px solid "+col.border, borderRadius:5, padding:"4px 2px", position:"relative", cursor:"default", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
-      {dotOpacity > 0 && <div style={{ position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%)", width:dotSize, height:dotSize, borderRadius:"50%", background:"rgba(255,255,255,"+dotOpacity+")", pointerEvents:"none" }} />}
-      {!isChase && <>
-        <div style={{ fontFamily:F.mono, fontSize:8, color:col.text, fontWeight:700, zIndex:1, lineHeight:1.2 }}>{zone.avg||"-"}</div>
-        <div style={{ fontFamily:F.mono, fontSize:7, color:col.text+"99", zIndex:1 }}>{zone.slg||"-"}</div>
-      </>}
-    </div>
-  );
-}
-function StrikeZoneModal({ player, onClose }) {
-  const [zData, setZData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
-  useEffect(() => {
-    let cancelled = false;
-    const zoneSchema = '{"batterHand":"R","advantage":"pitcher","advantageSummary":"Pitcher exploits low-outside with sinker","matchupNote":"2 career HR in 18 AB .278 AVG","zones":[{"row":0,"col":0,"label":"High Out","avg":".220","slg":".380","hrRate":0.02,"grade":"cool","pitcherFreq":0.06},{"row":0,"col":1,"label":"High Mid","avg":".290","slg":".520","hrRate":0.05,"grade":"warm","pitcherFreq":0.08},{"row":0,"col":2,"label":"High In","avg":".310","slg":".650","hrRate":0.09,"grade":"hot","pitcherFreq":0.04},{"row":1,"col":0,"label":"Mid Out","avg":".198","slg":".290","hrRate":0.01,"grade":"cold","pitcherFreq":0.22},{"row":1,"col":1,"label":"Heart","avg":".380","slg":".720","hrRate":0.12,"grade":"hot","pitcherFreq":0.14},{"row":1,"col":2,"label":"Mid In","avg":".340","slg":".680","hrRate":0.10,"grade":"hot","pitcherFreq":0.10},{"row":2,"col":0,"label":"Low Out","avg":".185","slg":".260","hrRate":0.01,"grade":"cold","pitcherFreq":0.18},{"row":2,"col":1,"label":"Low Mid","avg":".240","slg":".400","hrRate":0.03,"grade":"cool","pitcherFreq":0.10},{"row":2,"col":2,"label":"Low In","avg":".260","slg":".450","hrRate":0.04,"grade":"neutral","pitcherFreq":0.08}],"chaseZones":[{"pos":"up-out","label":"Up Out","avg":".110","slg":".150","grade":"cold","pitcherFreq":0.02},{"pos":"dn-out","label":"Dn Out","avg":".130","slg":".160","grade":"cold","pitcherFreq":0.04}],"pitcherPitches":[{"name":"Sinker","usage":0.38,"zone":"Low Outside"},{"name":"Slider","usage":0.28,"zone":"Away whiff pitch"},{"name":"4-Seam FB","usage":0.22,"zone":"Up & In"},{"name":"Changeup","usage":0.12,"zone":"Low Away tunnel"}],"hotZones":["High Inside","Heart","Mid Inside"],"coldZones":["Low Outside","Mid Outside"]}';
-    const prompt = ["You are an MLB Statcast zone analyst. Today is May 3 2026.", "Generate a zone breakdown for: BATTER: "+player.name+" ("+player.team+")", "PITCHER: "+player.pitcher+" ("+player.pitcherHand+" ERA "+(player.pitcherERA??"N/A")+")", "RULES: Use ONLY double-quotes. Start with { end with }. No other text.", "Return this exact JSON structure (fill in real data):", zoneSchema].join("\n");
-    callClaude(prompt).then(raw => {
-      if (cancelled) return;
-      try { setZData(grabJSON(raw)); } catch(e) { setErr("Zone parse error: "+e.message.slice(0,120)); }
-      setLoading(false);
-    }).catch(e => { if (!cancelled) { setErr(e.message); setLoading(false); } });
-    return () => { cancelled = true; };
-  }, []);
-  const grid = [[null,null,null],[null,null,null],[null,null,null]];
-  if (zData?.zones) zData.zones.forEach(z => { if (z.row>=0&&z.row<=2&&z.col>=0&&z.col<=2) grid[z.row][z.col]=z; });
-  const adv = zData?.advantage;
-  const advColor = adv==="batter"?T.green:adv==="pitcher"?T.red:T.amber;
-  return (
-    <div onClick={e => { if (e.target===e.currentTarget) onClose(); }} style={{ position:"fixed", inset:0, zIndex:1000, background:"rgba(0,0,0,0.85)", backdropFilter:"blur(6px)", display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
-      <div style={{ background:T.panel, border:"1px solid "+T.border, borderRadius:16, width:"100%", maxWidth:520, maxHeight:"90vh", overflowY:"auto", padding:"18px 18px 22px", boxShadow:"0 0 60px rgba(0,0,0,0.9)" }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14 }}>
-          <div>
-            <div style={{ fontFamily:F.mono, fontSize:9, letterSpacing:2, color:T.muted, marginBottom:3 }}>🎯 PITCHER VS BATTER STRIKE ZONE</div>
-            <div style={{ fontFamily:F.arch, fontSize:16, color:T.text }}>{player.emoji||"⚾"} {player.name}</div>
-            <div style={{ fontFamily:F.mono, fontSize:10, color:T.muted }}>vs {player.pitcher} ({player.pitcherHand}) · ERA {player.pitcherERA??"N/A"}</div>
-          </div>
-          <button onClick={onClose} style={{ background:"transparent", color:T.muted, border:"1px solid "+T.border, borderRadius:7, padding:"5px 11px", fontFamily:F.mono, fontSize:11, cursor:"pointer" }}>✕</button>
+    <div style={{
+      animation: "hrs-up .35s ease " + delay + "ms both",
+      background: rank <= 3 ? c + "0a" : T.dim,
+      border: "1px solid " + (rank <= 3 ? c + "33" : T.border),
+      borderRadius: 10, marginBottom: 7, overflow: "hidden",
+    }}>
+      {/* Main row */}
+      <div
+        onClick={() => setExpanded(v => !v)}
+        style={{ padding: "10px 12px", cursor: "pointer", display: "flex", gap: 10, alignItems: "center" }}
+      >
+        {/* Rank */}
+        <div style={{
+          width: 22, flexShrink: 0, fontFamily: F.bebas, fontSize: 18,
+          color: rank === 1 ? T.gold : rank === 2 ? "#c0c0c0" : rank === 3 ? "#cd7f32" : T.muted,
+          textAlign: "center",
+        }}>
+          {rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : rank}
         </div>
-        {loading && <div style={{ textAlign:"center", padding:"40px 0" }}><Spin size={32} /><div style={{ fontFamily:F.mono, fontSize:11, color:T.muted, marginTop:12 }}>Generating zone data...</div></div>}
-        {err && !loading && <div style={{ fontFamily:F.mono, fontSize:11, color:T.red, padding:"20px 0", textAlign:"center" }}>{err}</div>}
-        {zData && !loading && <>
-          <div style={{ background:advColor+"14", border:"1px solid "+advColor+"40", borderRadius:8, padding:"8px 12px", marginBottom:12 }}>
-            <div style={{ fontFamily:F.mono, fontSize:9, color:advColor, letterSpacing:1, marginBottom:2 }}>{adv==="batter"?"⚡ BATTER ADVANTAGE":adv==="pitcher"?"🎯 PITCHER ADVANTAGE":"⚖️ NEUTRAL MATCHUP"}</div>
-            <div style={{ fontFamily:F.mono, fontSize:10, color:advColor+"cc", lineHeight:1.5 }}>{zData.advantageSummary}</div>
+
+        {/* Headshot */}
+        <Headshot mlbId={p.mlbId} name={p.name} size={44} teamColor={p.teamColor || T.accent} />
+
+        {/* Name + team */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: F.arch, fontSize: 13, color: T.text, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {p.name}
           </div>
-          <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:10 }}>
-            {[["hot","🔥 Hot"],["warm","🟠 Warm"],["neutral","⚪ Neutral"],["cool","🔵 Cool"],["cold","❄️ Cold"]].map(([g,l]) => { const col=zoneColor(g); return <div key={g} style={{ fontFamily:F.mono, fontSize:9, background:col.bg, border:"1px solid "+col.border, color:col.text, borderRadius:4, padding:"2px 7px" }}>{l}</div>; })}
-            <div style={{ fontFamily:F.mono, fontSize:9, color:T.muted, padding:"2px 7px", background:"rgba(255,255,255,0.04)", borderRadius:4, border:"1px solid "+T.border }}>● pitch freq</div>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+            <span style={{ fontFamily: F.mono, fontSize: 9, color: T.muted }}>{p.team}</span>
+            {p.isHome
+              ? <span style={{ fontFamily: F.mono, fontSize: 9, color: T.green }}>🏠 HOME</span>
+              : <span style={{ fontFamily: F.mono, fontSize: 9, color: T.teal }}>✈ AWAY</span>}
           </div>
-          <div style={{ background:T.card, border:"1px solid "+T.border, borderRadius:10, padding:10, marginBottom:12 }}>
-            <div style={{ display:"flex", gap:4, marginBottom:4, paddingLeft:48 }}>
-              {["OUTSIDE","MIDDLE","INSIDE"].map(l => <div key={l} style={{ flex:1, textAlign:"center", fontFamily:F.mono, fontSize:7, color:T.muted, letterSpacing:1 }}>{l}</div>)}
-            </div>
-            {["HIGH","MID","LOW"].map((rowLabel, ri) => (
-              <div key={ri} style={{ display:"flex", gap:4, marginBottom:4, alignItems:"stretch" }}>
-                <div style={{ width:44, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:F.mono, fontSize:8, color:T.muted, flexShrink:0, letterSpacing:1 }}>{rowLabel}</div>
-                {[0,1,2].map(ci => <ZoneCell key={ci} zone={grid[ri][ci]} />)}
+        </div>
+
+        {/* HR % big number */}
+        <div style={{ textAlign: "right", flexShrink: 0 }}>
+          <div style={{ fontFamily: F.bebas, fontSize: 26, color: c, lineHeight: 1 }}>
+            {hrPct.toFixed(1)}%
+          </div>
+          <div style={{ fontFamily: F.mono, fontSize: 8, color: T.muted }}>HR CHANCE</div>
+        </div>
+
+        {/* Expand arrow */}
+        <div style={{ color: T.muted, fontSize: 12, flexShrink: 0, transition: "transform .2s", transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}>▼</div>
+      </div>
+
+      {/* Expanded detail */}
+      {expanded && (
+        <div style={{ padding: "0 12px 12px 12px", borderTop: "1px solid " + T.border }}>
+          <div style={{ marginTop: 10, display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+            {[
+              ["vs", p.pitcher + " (" + p.pitcherHand + ") ERA " + (p.pitcherERA ?? "N/A"), T.amber],
+              ["2026", (p.seasonHRs ?? "-") + " HR / " + (p.gamesPlayed ?? "-") + "g", T.accent],
+              ["OPS", p.ops ?? "-", T.text],
+              ["EV", p.exitVelo ? p.exitVelo + "mph" : "-", T.text],
+              ["PARK×", p.parkFactor ?? "-", T.text],
+            ].map(([l, v, col]) => (
+              <div key={l} style={{ fontFamily: F.mono, fontSize: 9, background: T.card, border: "1px solid " + T.border, borderRadius: 5, padding: "3px 8px" }}>
+                <span style={{ color: T.muted, marginRight: 4 }}>{l}</span>
+                <span style={{ color: col }}>{v}</span>
               </div>
             ))}
-            {zData.chaseZones?.length > 0 && <>
-              <div style={{ fontFamily:F.mono, fontSize:7, color:T.muted, letterSpacing:1, marginTop:5, marginBottom:3, paddingLeft:48 }}>CHASE (BALLS)</div>
-              <div style={{ display:"flex", gap:4, paddingLeft:48 }}>{zData.chaseZones.map((z,i) => <ZoneCell key={i} zone={z} isChase />)}</div>
-            </>}
-            <div style={{ fontFamily:F.mono, fontSize:7, color:T.muted, textAlign:"center", marginTop:8, letterSpacing:1 }}>TOP = BATTING AVG · BOTTOM = SLG · DOT SIZE = PITCHER FREQUENCY</div>
           </div>
-          {zData.pitcherPitches?.length > 0 && <div style={{ marginBottom:12 }}>
-            <div style={{ fontFamily:F.mono, fontSize:9, color:T.muted, letterSpacing:2, marginBottom:7 }}>PITCHER ARSENAL</div>
-            {zData.pitcherPitches.map((pt,i) => (
-              <div key={i} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:5, background:T.dim, border:"1px solid "+T.border, borderRadius:7, padding:"6px 10px" }}>
-                <div style={{ fontFamily:F.arch, fontSize:11, color:T.text, width:100, flexShrink:0 }}>{pt.name}</div>
-                <div style={{ flex:1, background:"rgba(255,255,255,0.06)", borderRadius:3, height:6, overflow:"hidden" }}>
-                  <div style={{ width:Math.round((pt.usage||0)*100)+"%", height:"100%", borderRadius:3, background:"linear-gradient(90deg,"+T.accent+","+T.purple+")" }} />
-                </div>
-                <div style={{ fontFamily:F.mono, fontSize:9, color:T.accent, width:30, textAlign:"right", flexShrink:0 }}>{Math.round((pt.usage||0)*100)}%</div>
-                <div style={{ fontFamily:F.mono, fontSize:9, color:T.muted, flex:1, minWidth:0 }}>{pt.zone}</div>
-              </div>
-            ))}
-          </div>}
-          <div style={{ display:"flex", gap:8, marginBottom:10 }}>
-            {zData.hotZones?.length > 0 && <div style={{ flex:1, background:T.red+"10", border:"1px solid "+T.red+"30", borderRadius:8, padding:"8px 10px" }}>
-              <div style={{ fontFamily:F.mono, fontSize:8, color:T.red, letterSpacing:1, marginBottom:5 }}>🔥 HOT ZONES</div>
-              {zData.hotZones.map((z,i) => <div key={i} style={{ fontFamily:F.mono, fontSize:9, color:T.red+"bb", marginBottom:2 }}>· {z}</div>)}
-            </div>}
-            {zData.coldZones?.length > 0 && <div style={{ flex:1, background:"#001840", border:"1px solid #1133aa44", borderRadius:8, padding:"8px 10px" }}>
-              <div style={{ fontFamily:F.mono, fontSize:8, color:"#4466cc", letterSpacing:1, marginBottom:5 }}>❄️ COLD ZONES</div>
-              {zData.coldZones.map((z,i) => <div key={i} style={{ fontFamily:F.mono, fontSize:9, color:"#4466cc", marginBottom:2 }}>· {z}</div>)}
-            </div>}
+
+          {/* HR bar */}
+          <div style={{ marginBottom: 8 }}>
+            <HRBar pct={hrPct} />
           </div>
-          {zData.matchupNote && <div style={{ fontFamily:F.mono, fontSize:10, color:T.muted, lineHeight:1.5, background:T.accent+"0a", border:"1px solid "+T.accent+"25", borderRadius:7, padding:"7px 10px" }}>📊 {zData.matchupNote}</div>}
-        </>}
-      </div>
-    </div>
-  );
-}
 
-function Ring({ pct = 70, sim = 0 }) {
-  const c = pct>=80?T.green:pct>=65?T.amber:T.red;
-  return (
-    <div style={{ textAlign:"center", flexShrink:0 }}>
-      <div style={{ fontFamily:F.bebas, fontSize:50, lineHeight:1, color:c, textShadow:"0 0 22px "+c+"55", animation:"hrs-pop .5s cubic-bezier(.34,1.56,.64,1) both" }}>{pct}</div>
-      <div style={{ fontFamily:F.mono, fontSize:8, color:T.muted, marginBottom:5 }}>CONF%</div>
-      <div style={{ width:58, height:58, borderRadius:"50%", background:"conic-gradient("+c+" "+(pct*3.6)+"deg,"+T.dim+" 0deg)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-        <div style={{ width:44, height:44, borderRadius:"50%", background:T.card, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
-          <span style={{ fontFamily:F.bebas, fontSize:15, color:c, lineHeight:1 }}>{sim}</span>
-          <span style={{ fontFamily:F.mono, fontSize:7, color:T.muted }}>/10k</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PCard({ p, rank, delay = 0 }) {
-  const conf = p.confidence ?? 70;
-  const sim  = p.simHRs ?? Math.round(conf * 100);
-  const c    = conf>=80?T.green:conf>=65?T.amber:T.red;
-  const medal = rank===1?"🥇":rank===2?"🥈":rank===3?"🥉":null;
-  const [showZone, setShowZone] = useState(false);
-  return (
-    <>
-      {showZone && <StrikeZoneModal player={p} onClose={() => setShowZone(false)} />}
-      <div style={{ animation:"hrs-up .45s ease "+delay+"ms both", background:"linear-gradient(135deg,"+T.card+" 0%,"+T.bg+" 100%)", border:"1px solid "+(rank<=3?c+"55":T.border), borderRadius:14, padding:"14px 16px", position:"relative", overflow:"hidden" }}>
-        <div style={{ position:"absolute", left:0, top:0, bottom:0, width:3, background:p.teamColor||T.accent, boxShadow:"0 0 12px "+(p.teamColor||T.accent)+"66" }} />
-        <div style={{ position:"absolute", top:10, right:14, fontFamily:F.bebas, fontSize:medal?30:22, color:medal?undefined:T.muted, opacity:medal?1:0.3, lineHeight:1 }}>{medal??"#"+rank}</div>
-        <div style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
-          <div style={{ flex:1, paddingRight:10, minWidth:0 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap", marginBottom:4 }}>
-              <span style={{ fontSize:15 }}>{p.emoji||"⚾"}</span>
-              <span style={{ fontFamily:F.arch, fontSize:16, color:T.text }}>{p.name}</span>
-              <Tag ch={p.team} color={T.accent} />
-              <Tag ch={p.isHome?"🏠 HOME":"✈ AWAY"} color={p.isHome?T.green:T.teal} />
-              <Tag ch={p.isDaytime?"☀️ DAY":"🌙 NIGHT"} color={p.isDaytime?T.amber:T.purple} />
-              {p.isOpenAir!==undefined && <Tag ch={p.isOpenAir?"🏟 OPEN":"🏠 DOME"} color={p.isOpenAir?T.amber:T.muted} />}
+          {p.bvpSummary && (
+            <div style={{ fontFamily: F.mono, fontSize: 9, color: T.accent + "cc", background: T.accent + "0a", border: "1px solid " + T.accent + "22", borderRadius: 6, padding: "5px 8px", marginBottom: 5, lineHeight: 1.5 }}>
+              📊 {p.bvpSummary}
             </div>
-            <div style={{ fontFamily:F.mono, fontSize:10, color:T.muted, marginBottom:8 }}>
-              {p.gameTime} · {p.venue} · <span style={{ color:T.amber }}>vs {p.pitcher} ({p.pitcherHand}) ERA {p.pitcherERA??"N/A"}</span>
+          )}
+          {p.homeAwaySplit && (
+            <div style={{ fontFamily: F.mono, fontSize: 9, color: T.green + "aa", background: T.green + "08", border: "1px solid " + T.green + "22", borderRadius: 6, padding: "5px 8px", marginBottom: 5, lineHeight: 1.5 }}>
+              {p.isHome ? "🏠" : "✈"} {p.homeAwaySplit}
             </div>
-            <Insight icon="📊" text={p.bvpSummary}    color={T.accent} />
-            <HomeAwaySplit p={p} />
-            <Insight icon="🌤" text={p.weatherInsight} color={T.green} />
-            <Insight icon={p.isDaytime?"☀️":"🌙"} text={p.dayNightInsight} color={T.purple} />
-            <Insight icon="🏟" text={p.stadiumInsight} color={T.amber} />
-            <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginTop:4 }}>
-              <Pill label="SIM-HR%" value={((sim/10000)*100).toFixed(1)+"%"} hi />
-              <Pill label="2026 HR" value={(p.seasonHRs??"-")+"/"+(p.gamesPlayed??"-")+"g"} />
-              <Pill label="OPS"     value={p.ops??"-"} />
-              <Pill label="EV"      value={p.exitVelo?p.exitVelo+"mph":"-"} />
-              <Pill label="BRRL%"   value={p.barrelPct?p.barrelPct+"%":"-"} />
-              <Pill label="PARK×"   value={p.parkFactor??"-"} />
-              <Pill label={p.isDaytime?"DAY-OPS":"NIGHT-OPS"} value={p.splitOPS??"-"} hi />
+          )}
+          {p.weatherInsight && (
+            <div style={{ fontFamily: F.mono, fontSize: 9, color: T.green + "cc", background: T.green + "08", border: "1px solid " + T.green + "22", borderRadius: 6, padding: "5px 8px", lineHeight: 1.5 }}>
+              🌤 {p.weatherInsight}
             </div>
-            <button onClick={() => setShowZone(true)} style={{ marginTop:10, width:"100%", background:"linear-gradient(135deg,"+T.accent+"18,"+T.purple+"12)", border:"1px solid "+T.accent+"40", borderRadius:7, padding:"7px 0", fontFamily:F.mono, fontSize:10, color:T.accent, cursor:"pointer", letterSpacing:1, display:"flex", alignItems:"center", justifyContent:"center", gap:7 }}>
-              <span style={{ fontSize:14 }}>🎯</span> VIEW PITCHER vs BATTER STRIKE ZONE
-            </button>
-          </div>
-          <Ring pct={conf} sim={sim} />
-        </div>
-      </div>
-    </>
-  );
-}
-
-function WStrip({ items }) {
-  if (!items?.length) return null;
-  return (
-    <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(195px,1fr))", gap:8, marginBottom:14 }}>
-      {items.map((w,i) => {
-        const out = (w.windSpeed??0)>10&&(w.windDir??"").toLowerCase().includes("out");
-        return <div key={i} style={{ background:T.panel, border:"1px solid "+T.border, borderRadius:10, padding:"8px 11px" }}>
-          <div style={{ fontFamily:F.arch, fontSize:11, color:T.text, marginBottom:3 }}>{w.venue}</div>
-          <div style={{ fontFamily:F.mono, fontSize:9, color:T.muted, lineHeight:1.7 }}>
-            {w.condition} · {w.tempF}°F<br/>
-            💨 {w.windSpeed}mph {w.windDir}{out&&<span style={{ color:T.green }}> ← HR BOOST!</span>}<br/>
-            {w.isOpenAir?"🏟 Open":"🏠 Dome"} · {w.isDaytime?"☀️ Day":"🌙 Night"}
-          </div>
-        </div>;
-      })}
-    </div>
-  );
-}
-
-function LogLine({ text, active }) {
-  return <div style={{ display:"flex", alignItems:"center", gap:8, fontFamily:F.mono, fontSize:11, color:active?T.accent:T.muted, animation:active?"hrs-blink 1.4s ease infinite":"none", marginBottom:2 }}>
-    {active&&<Spin size={10} />}{text}
-  </div>;
-}
-
-function GameTable({ games, onRemove, onClearAll, onRestoreAll }) {
-  const [confirm, setConfirm] = useState(false);
-  const allCleared  = games.length === 0;
-  const someRemoved = games.length < ALL_GAMES.length;
-  const handleClearAll = () => {
-    if (confirm) { onClearAll(); setConfirm(false); }
-    else { setConfirm(true); setTimeout(() => setConfirm(false), 3000); }
-  };
-  const eraDisplay = (era) => era===null||era===undefined ? "N/A" : String(era);
-  return (
-    <div style={{ background:T.panel, border:"1px solid "+T.border, borderRadius:10, padding:"11px 13px", marginBottom:14 }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8, flexWrap:"wrap", gap:6 }}>
-        <div style={{ fontFamily:F.mono, fontSize:9, letterSpacing:2, color:T.muted }}>
-          MAY 3 2026 — {games.length} GAME{games.length!==1?"S":""} ON BOARD
-          {someRemoved&&!allCleared&&<span style={{ color:T.amber, marginLeft:8 }}>({ALL_GAMES.length-games.length} removed)</span>}
-        </div>
-        <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-          {someRemoved && <button onClick={onRestoreAll} style={{ background:T.green+"18", color:T.green, border:"1px solid "+T.green+"44", borderRadius:6, padding:"4px 11px", fontFamily:F.mono, fontSize:9, cursor:"pointer", letterSpacing:1 }}>↺ RESTORE ALL</button>}
-          {!allCleared && <button onClick={handleClearAll} style={{ background:confirm?T.red+"28":T.red+"10", color:confirm?T.red:T.muted, border:"1px solid "+(confirm?T.red+"55":T.muted+"25"), borderRadius:6, padding:"4px 11px", fontFamily:F.mono, fontSize:9, cursor:"pointer", letterSpacing:1, animation:confirm?"hrs-shake .3s ease":"none", transition:"all .2s" }}>{confirm?"⚠️ CONFIRM CLEAR ALL":"✕ CLEAR ALL GAMES"}</button>}
-        </div>
-      </div>
-      {allCleared ? (
-        <div style={{ textAlign:"center", padding:"24px 0", fontFamily:F.mono, fontSize:11, color:T.muted }}>
-          Board cleared. <span onClick={onRestoreAll} style={{ color:T.accent, cursor:"pointer", textDecoration:"underline" }}>Restore all 15 games</span>
-        </div>
-      ) : (
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(235px,1fr))", gap:5 }}>
-          {games.map((g,i) => {
-            const hot = (g.awayERA>=5.5)||(g.homeERA>=5.5);
-            return (
-              <div key={g.away+g.home+i} style={{ background:hot?T.green+"08":T.dim, border:"1px solid "+(hot?T.green+"30":T.border), borderRadius:7, padding:"6px 9px", fontFamily:F.mono, fontSize:9, position:"relative" }}>
-                <button onClick={() => onRemove(i)} onMouseEnter={e=>{e.currentTarget.style.color=T.red;e.currentTarget.style.background=T.red+"20";}} onMouseLeave={e=>{e.currentTarget.style.color=T.muted;e.currentTarget.style.background="transparent";}} style={{ position:"absolute", top:3, right:4, background:"transparent", color:T.muted, border:"none", cursor:"pointer", fontSize:12, lineHeight:1, padding:"1px 4px", borderRadius:3, transition:"all .15s" }} title={"Remove "+g.away+"@"+g.home}>✕</button>
-                <div style={{ color:"#6090c0", fontWeight:500, marginBottom:2, paddingRight:16 }}>{g.away}@{g.home} · {g.time}</div>
-                <div style={{ color:g.awayERA>=5.5?T.green:T.muted }}>✈ {g.awayP} {g.awayH} ERA {eraDisplay(g.awayERA)}{g.awayERA>=5.5?" 🔥":""}</div>
-                <div style={{ color:g.homeERA>=5.5?T.green:T.muted }}>🏠 {g.homeP} {g.homeH} ERA {eraDisplay(g.homeERA)}{g.homeERA>=5.5?" 🔥":""}</div>
-              </div>
-            );
-          })}
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function RateLimitScreen({ error, onDismiss }) {
-  const resetsAt = error?.resetsAt;
-  const [timeLeft, setTimeLeft] = useState("");
-  useEffect(() => {
-    if (!resetsAt) return;
-    const tick = () => {
-      const diff = resetsAt*1000 - Date.now();
-      if (diff<=0) { setTimeLeft("now — try again!"); return; }
-      setTimeLeft(Math.floor(diff/60000)+"m "+Math.floor((diff%60000)/1000)+"s");
-    };
-    tick();
-    const iv = setInterval(tick, 1000);
-    return () => clearInterval(iv);
-  }, [resetsAt]);
+/* ── Game accordion card ── */
+function GameCard({ game, result, isOpen, onToggle, onRemove, isRunning }) {
+  const eraDisplay = (era) => era === null || era === undefined ? "N/A" : String(era);
+  const awayHot = (game.awayERA ?? 0) >= 5.5;
+  const homeHot = (game.homeERA ?? 0) >= 5.5;
+  const anyHot  = awayHot || homeHot;
+  const players = result?.players ?? [];
+  const topHR   = players[0]?.hrChancePct ?? 0;
+
   return (
-    <div style={{ background:"#0d0a00", border:"1px solid "+T.amber+"55", borderRadius:14, padding:"32px 24px", textAlign:"center" }}>
-      <div style={{ fontSize:42, marginBottom:14 }}>⏳</div>
-      <div style={{ fontFamily:F.arch, fontSize:18, color:T.amber, marginBottom:10 }}>API Rate Limit Reached</div>
-      <div style={{ fontFamily:F.mono, fontSize:11, color:T.muted, lineHeight:1.8, marginBottom:20 }}>
-        You have hit the 5-hour API usage limit.<br/>Your 7-day window is still healthy.<br/>
-        {resetsAt ? <>Resets in: <span style={{ color:T.amber, fontWeight:700 }}>{timeLeft}</span></> : "Resets in a few minutes."}
+    <div style={{
+      background: T.panel,
+      border: "1px solid " + (anyHot ? T.green + "33" : T.border),
+      borderRadius: 12, marginBottom: 8, overflow: "hidden",
+      animation: "hrs-up .3s ease both",
+    }}>
+      {/* Header — always visible */}
+      <div
+        onClick={onToggle}
+        style={{
+          padding: "11px 14px", cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 10,
+          background: isOpen ? T.dim : "transparent",
+          userSelect: "none",
+        }}
+      >
+        {/* Teams */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
+            <span style={{ fontFamily: F.arch, fontSize: 14, color: T.text }}>
+              {game.away} <span style={{ color: T.muted, fontFamily: F.mono, fontSize: 10 }}>@</span> {game.home}
+            </span>
+            {anyHot && <span style={{ fontSize: 11 }}>🔥</span>}
+            {result && <span style={{ fontFamily: F.mono, fontSize: 9, color: T.green }}>✅ analyzed</span>}
+          </div>
+          <div style={{ fontFamily: F.mono, fontSize: 9, color: T.muted }}>
+            {game.venue} · {game.time}
+          </div>
+          <div style={{ fontFamily: F.mono, fontSize: 8, color: T.muted, marginTop: 2 }}>
+            <span style={{ color: awayHot ? T.green : T.muted }}>✈ {game.awayP} ({game.awayH}) ERA {eraDisplay(game.awayERA)}</span>
+            <span style={{ color: T.border, margin: "0 6px" }}>·</span>
+            <span style={{ color: homeHot ? T.green : T.muted }}>🏠 {game.homeP} ({game.homeH}) ERA {eraDisplay(game.homeERA)}</span>
+          </div>
+        </div>
+
+        {/* Top HR % badge if analyzed */}
+        {result && players[0] && (
+          <div style={{ textAlign: "center", flexShrink: 0 }}>
+            <div style={{ fontFamily: F.bebas, fontSize: 20, color: T.gold, lineHeight: 1 }}>{topHR.toFixed(0)}%</div>
+            <div style={{ fontFamily: F.mono, fontSize: 7, color: T.muted }}>TOP HR</div>
+          </div>
+        )}
+
+        {/* Remove + toggle */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+          <button
+            onClick={(e) => { e.stopPropagation(); onRemove(); }}
+            onMouseEnter={e => { e.currentTarget.style.color = T.red; }}
+            onMouseLeave={e => { e.currentTarget.style.color = T.muted; }}
+            style={{ background: "transparent", border: "none", color: T.muted, cursor: "pointer", fontSize: 13, padding: "2px 5px", borderRadius: 4 }}
+            title="Remove game"
+          >✕</button>
+          <div style={{
+            color: T.muted, fontSize: 11, transition: "transform .25s",
+            transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+          }}>▼</div>
+        </div>
       </div>
-      <div style={{ background:T.amber+"10", border:"1px solid "+T.amber+"30", borderRadius:9, padding:"10px 16px", marginBottom:20, fontFamily:F.mono, fontSize:10, color:T.amber+"cc", lineHeight:1.6 }}>
-        💡 Tip: Run fewer games at a time to reduce token usage.
-      </div>
-      <button onClick={onDismiss} style={{ background:T.amber, color:T.bg, border:"none", borderRadius:9, padding:"10px 28px", fontFamily:F.arch, fontSize:13, cursor:"pointer" }}>Got It</button>
+
+      {/* Expanded content */}
+      {isOpen && (
+        <div style={{ padding: "10px 12px 12px", borderTop: "1px solid " + T.border }}>
+          {isRunning && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 0", fontFamily: F.mono, fontSize: 11, color: T.accent, animation: "hrs-blink 1.4s ease infinite" }}>
+              <Spin size={12} /> Analyzing matchups...
+            </div>
+          )}
+          {!isRunning && !result && (
+            <div style={{ fontFamily: F.mono, fontSize: 10, color: T.muted, padding: "10px 0", textAlign: "center" }}>
+              Hit ▶ RUN ANALYSIS to see player HR chances
+            </div>
+          )}
+          {!isRunning && result && players.length > 0 && (
+            <>
+              <div style={{ fontFamily: F.mono, fontSize: 8, letterSpacing: 2, color: T.muted, marginBottom: 8 }}>
+                TOP HR CANDIDATES — {game.away}@{game.home}
+              </div>
+              {players.map((p, i) => (
+                <PlayerRow key={p.name + i} p={p} rank={i + 1} delay={i * 60} />
+              ))}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
+}
+
+/* ── Spinner ── */
+function Spin({ size = 18, color = T.accent }) {
+  return <div style={{ width:size, height:size, flexShrink:0, border:"2px solid "+color+"25", borderTopColor:color, borderRadius:"50%", animation:"hrs-spin .75s linear infinite", display:"inline-block" }} />;
+}
+
+function LogLine({ text, active }) {
+  return <div style={{ display:"flex", alignItems:"center", gap:8, fontFamily:F.mono, fontSize:11, color:active?T.accent:T.muted, animation:active?"hrs-blink 1.4s ease infinite":"none", marginBottom:3 }}>
+    {active && <Spin size={10} />}{text}
+  </div>;
+}
+
+/* ── Rate limit screen ── */
+function RateLimitScreen({ error, onDismiss }) {
+  const [timeLeft, setTimeLeft] = useState("");
+  useEffect(() => {
+    if (!error?.resetsAt) return;
+    const tick = () => {
+      const diff = error.resetsAt * 1000 - Date.now();
+      if (diff <= 0) { setTimeLeft("now — try again!"); return; }
+      setTimeLeft(Math.floor(diff / 60000) + "m " + Math.floor((diff % 60000) / 1000) + "s");
+    };
+    tick(); const iv = setInterval(tick, 1000); return () => clearInterval(iv);
+  }, [error?.resetsAt]);
+  return (
+    <div style={{ background:"#0d0a00", border:"1px solid "+T.amber+"55", borderRadius:14, padding:"28px 22px", textAlign:"center" }}>
+      <div style={{ fontSize:38, marginBottom:10 }}>⏳</div>
+      <div style={{ fontFamily:F.arch, fontSize:17, color:T.amber, marginBottom:8 }}>API Rate Limit Reached</div>
+      <div style={{ fontFamily:F.mono, fontSize:11, color:T.muted, lineHeight:1.8, marginBottom:18 }}>
+        5-hour limit hit. 7-day window is fine.<br/>
+        {error?.resetsAt ? <>Resets in: <span style={{ color:T.amber, fontWeight:700 }}>{timeLeft}</span></> : "Resets shortly."}
+      </div>
+      <button onClick={onDismiss} style={{ background:T.amber, color:T.bg, border:"none", borderRadius:9, padding:"10px 26px", fontFamily:F.arch, fontSize:13, cursor:"pointer" }}>Got It</button>
+    </div>
+  );
+}
+
+/* ── Prompt builder ── */
+function buildPrompt(games) {
+  const eraStr = e => e === null || e === undefined ? "N/A" : String(e);
+  const lines = games.map(g =>
+    g.away + "@" + g.home + " | " + g.venue + " | " + g.city + " " + g.st + " | " + g.time +
+    " | Away SP: " + g.awayP + " " + g.awayH + " ERA " + eraStr(g.awayERA) + " " + g.awayRec +
+    " | Home SP: " + g.homeP + " " + g.homeH + " ERA " + eraStr(g.homeERA) + " " + g.homeRec
+  ).join("\n");
+
+  return [
+    "You are an elite MLB home run analyst. Today is May 3 2026.",
+    "",
+    "KNOWN 2026 ROSTER FACTS (verify before adding any player):",
+    "Pete Alonso=BAL, Juan Soto=NYM, Max Fried=NYY, Aaron Judge=NYY, Gunnar Henderson=BAL,",
+    "Shohei Ohtani=LAD, Yordan Alvarez=HOU, Matt Olson=ATL, Kyle Schwarber=PHI, Bryce Harper=PHI,",
+    "Freddie Freeman=LAD, Mookie Betts=LAD, Rafael Devers=SF, Willy Adames=SF, Byron Buxton=MIN,",
+    "Jose Ramirez=CLE, Bobby Witt Jr=KC, Julio Rodriguez=SEA, Randy Arozarena=SEA,",
+    "Shea Langeliers=ATH, Nick Kurtz=ATH, James Wood=WSH, Mike Trout=LAA, Elly De La Cruz=CIN,",
+    "Nolan Arenado=STL, Jordan Walker=STL, Alex Bregman=BOS, Jarren Duran=BOS,",
+    "Fernando Tatis Jr=SD, Munetaka Murakami=CWS, Vladimir Guerrero Jr=TOR,",
+    "Francisco Lindor=NYM, Ian Happ=CHC, Pete Crow-Armstrong=CHC, Matt Chapman=SF",
+    "",
+    "TODAY'S GAMES:",
+    lines,
+    "",
+    "TASK: For EACH game return the top 5 HR candidates (mix of both teams, best matchups first).",
+    "Include each player's MLB MLBAM ID for headshots.",
+    "",
+    "For each player provide:",
+    "- name, team, mlbId (MLBAM integer ID), emoji, teamColor (hex), isHome (bool)",
+    "- hrChancePct: realistic HR probability % for today (0-35, most players 3-15%)",
+    "  Factor in: pitcher ERA, BvP, park factor, weather, platoon, current form",
+    "  High ERA pitcher + hitter-friendly park = higher %. Elite pitcher = lower %.",
+    "- pitcher, pitcherHand, pitcherERA, bvpSummary, homeAwaySplit, weatherInsight",
+    "- seasonHRs, gamesPlayed, ops, exitVelo, parkFactor, simHRs (out of 10000), confidence",
+    "",
+    "Park HR factors: Coors=1.38 SutterHealth=1.28 Wrigley=1.14 Yankee=1.10 Fenway=1.06",
+    "Angel=1.02 Target=1.02 Busch=1.01 Comerica=1.00 Nationals=1.00 loanDepot=0.95",
+    "Tropicana=0.94 PNC=0.90 Petco=0.88 TMobile=0.85",
+    "",
+    "COMMON MLBAM IDs: Aaron Judge=592450, Shohei Ohtani=660271, Mookie Betts=605141,",
+    "Yordan Alvarez=670541, Matt Olson=621566, Kyle Schwarber=656941, Bryce Harper=547180,",
+    "Gunnar Henderson=683002, Pete Alonso=624413, Juan Soto=665742, Vladimir Guerrero Jr=665489,",
+    "Bo Bichette=666182, Jose Ramirez=608070, Elly De La Cruz=682829, Bobby Witt Jr=677951,",
+    "Mike Trout=545361, Nolan Arenado=571448, Freddie Freeman=518692, Rafael Devers=646240,",
+    "Fernando Tatis Jr=665487, Francisco Lindor=596019, Kyle Schwarber=656941,",
+    "James Wood=694192, Byron Buxton=621439, Randy Arozarena=668227, Ian Happ=664023,",
+    "Pete Crow-Armstrong=682998, Julio Rodriguez=677594, Shea Langeliers=669127,",
+    "Willy Adames=642715, Matt Chapman=656305, Jarren Duran=680776, Alex Bregman=608324",
+    "",
+    "CRITICAL JSON RULES: Use ONLY double-quotes. Start with { end with }. No other text.",
+    "",
+    '{"games":[{"away":"BAL","home":"NYY","venue":"Yankee Stadium","time":"1:35 PM ET",',
+    '"players":[{"name":"Aaron Judge","team":"NYY","mlbId":592450,"emoji":"⚡","teamColor":"#003087",',
+    '"isHome":true,"hrChancePct":18.5,"pitcher":"Kyle Bradish","pitcherHand":"RHP","pitcherERA":4.20,',
+    '"bvpSummary":"4 career HR vs Bradish in 22 AB, .364 AVG","homeAwaySplit":"HOME: 1.042 OPS 8HR | ROAD: .898 OPS 4HR",',
+    '"weatherInsight":"67F partly cloudy 14mph wind OUT to RF — Yankee short porch HR boost",',
+    '"seasonHRs":12,"gamesPlayed":32,"ops":"1.052","exitVelo":"96.1","parkFactor":"1.10",',
+    '"simHRs":1850,"confidence":88}]}]}',
+  ].join("\n");
 }
 
 /* ════════ MAIN APP ════════ */
 export default function App() {
   useAssets();
-  const [games,   setGames]   = useState([...ALL_GAMES]);
-  const [phase,   setPhase]   = useState("ready");
-  const [logs,    setLogs]    = useState([]);
-  const [players, setPlayers] = useState([]);
-  const [weather, setWeather] = useState([]);
-  const [errMsg,  setErrMsg]  = useState("");
+
+  const [games,    setGames]    = useState([...ALL_GAMES]);
+  const [openGames, setOpenGames] = useState(new Set());
+  const [phase,    setPhase]    = useState("ready");
+  const [logs,     setLogs]     = useState([]);
+  const [results,  setResults]  = useState({});  // key: away+home → { players }
+  const [errMsg,   setErrMsg]   = useState("");
+  const [confirm,  setConfirm]  = useState(false);
   const busy = useRef(false);
+
   const pushLog = msg => setLogs(p => [...p.slice(-12), msg]);
-  const removeGame = idx => setGames(prev => prev.filter((_,i) => i!==idx));
-  const clearAll   = ()  => setGames([]);
-  const restoreAll = ()  => setGames([...ALL_GAMES]);
 
-  const run = async () => {
-    if (busy.current||games.length===0) return;
-    busy.current = true;
-    setPhase("running"); setLogs([]); setPlayers([]); setWeather([]); setErrMsg("");
-    try {
-      pushLog("⚾ Loading "+games.length+" game(s)...");
-      await new Promise(r=>setTimeout(r,250));
-      pushLog("📊 Running BvP + home/away split analysis...");
-      await new Promise(r=>setTimeout(r,200));
-      pushLog("🌤 Estimating weather & wind per stadium city...");
-      await new Promise(r=>setTimeout(r,150));
-      pushLog("🌙 Checking day / night OPS splits...");
-      await new Promise(r=>setTimeout(r,150));
-      pushLog("🏟 Evaluating park factors & stadium type...");
-      await new Promise(r=>setTimeout(r,150));
-      pushLog("🎲 Running 10,000-game Monte Carlo per player...");
-      await new Promise(r=>setTimeout(r,150));
-      pushLog("🤖 Claude ranking top HR candidates...");
-      const raw    = await callClaude(buildPrompt(games));
-      const result = grabJSON(raw);
-      let candidates = (result.players??[]).sort((a,b)=>(b.confidence??0)-(a.confidence??0)).slice(0,15);
-      if (!candidates.length) throw new Error("No players returned — please try again.");
+  const toggleGame = (key) => setOpenGames(prev => {
+    const next = new Set(prev);
+    next.has(key) ? next.delete(key) : next.add(key);
+    return next;
+  });
 
-      pushLog("🔍 Verifying players on correct 2026 rosters...");
-      const verifyPrompt = [
-        "You are an MLB roster expert. Today is May 3 2026.",
-        "Check each player is on that team's active 26-man roster. Account for all offseason moves.",
-        "RULES: Use ONLY double-quotes. Start with [ end with ]. No other text.",
-        "",
-        "Players to verify:",
-        candidates.map((p,i) => (i+1)+". "+p.name+" on "+p.team).join("\n"),
-        "",
-        '[{"i":0,"ok":true,"fix":""},{"i":1,"ok":false,"fix":"Player was traded to LAD"}]',
-      ].join("\n");
-      let checks = [];
-      try {
-        const verifyRaw = await callClaude(verifyPrompt);
-        const parsed = grabJSON(verifyRaw);
-        checks = Array.isArray(parsed) ? parsed : [];
-      } catch(_) {
-        pushLog("⚠️ Roster check inconclusive — using AI picks as-is");
-      }
-      const verified = candidates.map((p,i) => {
-        const chk = checks.find(c=>c.i===i);
-        if (!chk||chk.ok!==false) return { ...p, rosterOK:true };
-        return { ...p, rosterFlagged:true, rosterIssue:chk.fix||"Not on "+p.team+" active roster" };
-      });
-      const flagged = verified.filter(p=>p.rosterFlagged);
-      flagged.forEach(p => pushLog("⚠️ Removed "+p.name+" — "+p.rosterIssue));
-      if (flagged.length===0) pushLog("✅ All players confirmed on correct 2026 rosters");
-      const finalPlayers = verified.filter(p=>!p.rosterFlagged).slice(0,10);
-      if (!finalPlayers.length) throw new Error("No valid players after roster check — please try again.");
-      pushLog("✅ Done! Top "+finalPlayers.length+" picks ranked.");
-      setPlayers(finalPlayers); setWeather(result.weatherSummary??[]); setPhase("done");
-    } catch(e) {
-      console.error(e);
-      if (e.isRateLimit) setErrMsg("__RATE_LIMIT__:"+(e.resetsAt||0));
-      else setErrMsg(e.message||String(e));
-      setPhase("error");
-    } finally { busy.current = false; }
+  const openAll  = () => setOpenGames(new Set(games.map(g => g.away + g.home)));
+  const closeAll = () => setOpenGames(new Set());
+
+  const removeGame = (idx) => {
+    const key = games[idx].away + games[idx].home;
+    setGames(prev => prev.filter((_, i) => i !== idx));
+    setOpenGames(prev => { const n = new Set(prev); n.delete(key); return n; });
   };
 
+  const clearAll = () => {
+    if (confirm) { setGames([]); setOpenGames(new Set()); setConfirm(false); }
+    else { setConfirm(true); setTimeout(() => setConfirm(false), 3000); }
+  };
+
+  const restoreAll = () => {
+    setGames([...ALL_GAMES]);
+    setResults({});
+  };
+
+  const run = async () => {
+    if (busy.current || games.length === 0) return;
+    busy.current = true;
+    setPhase("running"); setLogs([]); setErrMsg("");
+
+    try {
+      pushLog("⚾ Loading " + games.length + " game(s)...");
+      await new Promise(r => setTimeout(r, 200));
+      pushLog("📊 Analyzing BvP + HR chance % per player...");
+      await new Promise(r => setTimeout(r, 150));
+      pushLog("🖼️ Fetching player headshots & MLBAM IDs...");
+      await new Promise(r => setTimeout(r, 150));
+      pushLog("🌤 Estimating weather per stadium city...");
+      await new Promise(r => setTimeout(r, 150));
+      pushLog("🎲 Running 10,000-game Monte Carlo...");
+      await new Promise(r => setTimeout(r, 150));
+      pushLog("🤖 Claude ranking HR candidates per game...");
+
+      const raw    = await callClaude(buildPrompt(games), 8000);
+      const parsed = grabJSON(raw);
+      const gameResults = parsed.games ?? [];
+
+      // Map results to game keys
+      const newResults = {};
+      gameResults.forEach(gr => {
+        const key = gr.away + gr.home;
+        const players = (gr.players ?? []).sort((a, b) => (b.hrChancePct ?? 0) - (a.hrChancePct ?? 0));
+        newResults[key] = { players };
+      });
+
+      setResults(newResults);
+
+      // Auto-open all analyzed games
+      setOpenGames(new Set(games.map(g => g.away + g.home)));
+
+      pushLog("✅ Done! " + gameResults.length + " games analyzed. Click any game to see HR %.");
+      setPhase("done");
+
+    } catch (e) {
+      console.error(e);
+      if (e.isRateLimit) setErrMsg("__RATE_LIMIT__:" + (e.resetsAt || 0));
+      else setErrMsg(e.message || String(e));
+      setPhase("error");
+    } finally {
+      busy.current = false;
+    }
+  };
+
+  const someRemoved = games.length < ALL_GAMES.length;
+  const isDone = phase === "done";
+
   return (
-    <div style={{ minHeight:"100vh", background:T.bg, color:T.text, paddingBottom:60 }}>
+    <div style={{ minHeight: "100vh", background: T.bg, color: T.text, paddingBottom: 60 }}>
+
       {/* HEADER */}
-      <div style={{ background:"linear-gradient(180deg,#0d1728 0%,"+T.bg+" 100%)", borderBottom:"1px solid "+T.border, padding:"18px 20px 12px", textAlign:"center", position:"relative", overflow:"hidden" }}>
+      <div style={{
+        background: "linear-gradient(180deg,#0d1728 0%," + T.bg + " 100%)",
+        borderBottom: "1px solid " + T.border,
+        padding: "18px 20px 12px", textAlign: "center",
+        position: "relative", overflow: "hidden",
+      }}>
         <div style={{ position:"absolute", left:0, right:0, height:2, pointerEvents:"none", background:"linear-gradient(transparent,"+T.accent+"28,transparent)", animation:"hrs-scan 5s linear infinite" }} />
-        <div style={{ fontFamily:F.mono, fontSize:9, letterSpacing:6, color:T.accent, opacity:.6, marginBottom:3 }}>AI · MLB · HOME RUN INTELLIGENCE · MAY 3 2026</div>
-        <div style={{ fontFamily:F.bebas, fontSize:40, letterSpacing:3, color:T.text, lineHeight:1, textShadow:"0 0 28px "+T.accent+"40" }}>⚾ SPHRS</div>
-        <div style={{ fontFamily:F.mono, fontSize:10, color:T.muted, marginTop:3 }}>BvP · HOME/AWAY · WEATHER · DAY/NIGHT · STADIUM · 10,000× MONTE CARLO</div>
+        <div style={{ fontFamily:F.mono, fontSize:9, letterSpacing:6, color:T.accent, opacity:.6, marginBottom:3 }}>
+          AI · MLB · HOME RUN INTELLIGENCE · MAY 3 2026
+        </div>
+        <div style={{ fontFamily:F.bebas, fontSize:40, letterSpacing:3, color:T.text, lineHeight:1, textShadow:"0 0 28px "+T.accent+"40" }}>
+          ⚾ SPHRS
+        </div>
+        <div style={{ fontFamily:F.mono, fontSize:10, color:T.muted, marginTop:3 }}>
+          HR CHANCE % · PLAYER HEADSHOTS · GAME ACCORDIONS · 10,000× MONTE CARLO
+        </div>
       </div>
 
-      <div style={{ maxWidth:860, margin:"0 auto", padding:"14px 13px" }}>
-        {/* READY */}
-        {phase==="ready" && <>
-          <GameTable games={games} onRemove={removeGame} onClearAll={clearAll} onRestoreAll={restoreAll} />
-          <div style={{ textAlign:"center", padding:"6px 0 18px" }}>
-            {games.length===0 ? (
-              <div style={{ fontFamily:F.mono, fontSize:11, color:T.muted, lineHeight:1.7 }}>No games on board. <span onClick={restoreAll} style={{ color:T.accent, cursor:"pointer", textDecoration:"underline" }}>Restore all 15 games</span></div>
-            ) : <>
-              <div style={{ fontFamily:F.mono, fontSize:11, color:T.muted, marginBottom:14, lineHeight:1.7 }}>
-                {games.length} game{games.length!==1?"s":""} on board · AI picks top HR candidates with BvP, home/away splits, weather & park factors.
-              </div>
-              <button onClick={run} style={{ background:"linear-gradient(135deg,"+T.accent+",#0099cc)", color:T.bg, border:"none", borderRadius:10, padding:"13px 40px", fontFamily:F.arch, fontSize:17, cursor:"pointer", boxShadow:"0 0 28px "+T.accent+"44" }}>
-                ▶ RUN ANALYSIS — {games.length} GAME{games.length!==1?"S":""}
-              </button>
-            </>}
-          </div>
-        </>}
+      <div style={{ maxWidth: 860, margin: "0 auto", padding: "14px 13px" }}>
 
-        {/* RUNNING */}
-        {phase==="running" && <>
-          <div style={{ background:T.panel, border:"1px solid "+T.accent+"40", borderRadius:14, padding:"20px 18px", animation:"hrs-glow 2s ease infinite", marginBottom:14 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16 }}>
-              <Spin size={28} />
+        {/* Controls bar */}
+        <div style={{
+          display: "flex", justifyContent: "space-between",
+          alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12,
+        }}>
+          <div style={{ fontFamily:F.mono, fontSize:9, letterSpacing:2, color:T.muted }}>
+            {games.length} GAME{games.length !== 1 ? "S" : ""} ON BOARD
+            {someRemoved && <span style={{ color:T.amber, marginLeft:8 }}>({ALL_GAMES.length - games.length} removed)</span>}
+          </div>
+          <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+            <button onClick={openAll} style={{ background:T.dim, color:T.muted, border:"1px solid "+T.border, borderRadius:6, padding:"4px 10px", fontFamily:F.mono, fontSize:9, cursor:"pointer" }}>↕ EXPAND ALL</button>
+            <button onClick={closeAll} style={{ background:T.dim, color:T.muted, border:"1px solid "+T.border, borderRadius:6, padding:"4px 10px", fontFamily:F.mono, fontSize:9, cursor:"pointer" }}>↕ COLLAPSE ALL</button>
+            {someRemoved && <button onClick={restoreAll} style={{ background:T.green+"18", color:T.green, border:"1px solid "+T.green+"44", borderRadius:6, padding:"4px 10px", fontFamily:F.mono, fontSize:9, cursor:"pointer" }}>↺ RESTORE ALL</button>}
+            {games.length > 0 && <button onClick={clearAll} style={{ background:confirm?T.red+"28":T.red+"10", color:confirm?T.red:T.muted, border:"1px solid "+(confirm?T.red+"55":T.muted+"25"), borderRadius:6, padding:"4px 10px", fontFamily:F.mono, fontSize:9, cursor:"pointer", animation:confirm?"hrs-shake .3s ease":"none" }}>{confirm ? "⚠️ CONFIRM" : "✕ CLEAR ALL"}</button>}
+          </div>
+        </div>
+
+        {/* Game accordions */}
+        {games.length === 0 ? (
+          <div style={{ textAlign:"center", padding:"30px 0", fontFamily:F.mono, fontSize:11, color:T.muted }}>
+            No games on board.{" "}
+            <span onClick={restoreAll} style={{ color:T.accent, cursor:"pointer", textDecoration:"underline" }}>Restore all 15</span>
+          </div>
+        ) : (
+          <div style={{ marginBottom: 14 }}>
+            {games.map((g, i) => {
+              const key = g.away + g.home;
+              return (
+                <GameCard
+                  key={key + i}
+                  game={g}
+                  result={results[key]}
+                  isOpen={openGames.has(key)}
+                  onToggle={() => toggleGame(key)}
+                  onRemove={() => removeGame(i)}
+                  isRunning={phase === "running"}
+                />
+              );
+            })}
+          </div>
+        )}
+
+        {/* Run button */}
+        {(phase === "ready" || phase === "done") && games.length > 0 && (
+          <div style={{ textAlign: "center", padding: "8px 0 16px" }}>
+            <button onClick={run} style={{
+              background: "linear-gradient(135deg," + T.accent + ",#0099cc)",
+              color: T.bg, border: "none", borderRadius: 10,
+              padding: "13px 40px", fontFamily: F.arch, fontSize: 17,
+              cursor: "pointer", boxShadow: "0 0 28px " + T.accent + "44",
+            }}>
+              {isDone ? "↺ RE-RUN ANALYSIS" : "▶ RUN ANALYSIS — " + games.length + " GAME" + (games.length !== 1 ? "S" : "")}
+            </button>
+          </div>
+        )}
+
+        {/* Running log */}
+        {phase === "running" && (
+          <div style={{ background:T.panel, border:"1px solid "+T.accent+"40", borderRadius:13, padding:"18px 16px", animation:"hrs-glow 2s ease infinite", marginBottom:14 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:14 }}>
+              <Spin size={26} />
               <div>
-                <div style={{ fontFamily:F.arch, fontSize:15, color:T.accent }}>Analyzing {games.length} games...</div>
-                <div style={{ fontFamily:F.mono, fontSize:10, color:T.muted }}>BvP · Home/Away · Weather · Day/Night · Stadium · 10,000× Monte Carlo</div>
+                <div style={{ fontFamily:F.arch, fontSize:14, color:T.accent }}>Analyzing {games.length} games...</div>
+                <div style={{ fontFamily:F.mono, fontSize:10, color:T.muted }}>BvP · HR % · Headshots · Weather · 10,000× Monte Carlo</div>
               </div>
             </div>
             <div style={{ borderTop:"1px solid "+T.border, paddingTop:10 }}>
-              {logs.map((l,i) => <LogLine key={i} text={l} active={i===logs.length-1} />)}
+              {logs.map((l, i) => <LogLine key={i} text={l} active={i === logs.length - 1} />)}
             </div>
           </div>
-          <GameTable games={games} onRemove={()=>{}} onClearAll={()=>{}} onRestoreAll={()=>{}} />
-        </>}
+        )}
 
-        {/* DONE */}
-        {phase==="done" && players.length>0 && <>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:10, marginBottom:14 }}>
-            <div>
-              <div style={{ fontFamily:F.mono, fontSize:9, letterSpacing:2, color:T.muted, marginBottom:3 }}>TOP 10 HR PICKS · MAY 3 2026 · {games.length} GAMES ANALYZED</div>
-              <div style={{ fontFamily:F.arch, fontSize:19, color:T.text }}>{players[0]?.emoji} {players[0]?.name} leads — {players[0]?.confidence}% confidence</div>
-            </div>
-            <button onClick={() => { setPhase("ready"); setPlayers([]); setWeather([]); }} style={{ background:"transparent", color:T.muted, border:"1px solid "+T.border, borderRadius:8, padding:"7px 15px", fontFamily:F.mono, fontSize:11, cursor:"pointer" }}>↺ RE-RUN</button>
-          </div>
-          <WStrip items={weather} />
-          <div style={{ display:"grid", gap:10 }}>
-            {players.map((pl,i) => <PCard key={pl.name+pl.team+i} p={pl} rank={i+1} delay={i*65} />)}
-          </div>
-          <div style={{ marginTop:20, textAlign:"center", fontFamily:F.mono, fontSize:9, color:"#111e2e" }}>
-            Claude AI · BvP + Home/Away + Weather + Day/Night + Stadium + 10,000× Monte Carlo · May 3 2026
-          </div>
-        </>}
-
-        {/* ERROR */}
-        {phase==="error" && (
+        {/* Error */}
+        {phase === "error" && (
           errMsg.startsWith("__RATE_LIMIT__") ? (
-            <RateLimitScreen error={{ isRateLimit:true, resetsAt:parseInt(errMsg.split(":")[1])||null }} onDismiss={() => { setPhase("ready"); setErrMsg(""); }} />
+            <RateLimitScreen
+              error={{ resetsAt: parseInt(errMsg.split(":")[1]) || null }}
+              onDismiss={() => { setPhase("ready"); setErrMsg(""); }}
+            />
           ) : (
-            <div style={{ background:T.red+"0e", border:"1px solid "+T.red+"40", borderRadius:14, padding:"28px 22px", textAlign:"center" }}>
-              <div style={{ fontSize:34, marginBottom:9 }}>⚠️</div>
-              <div style={{ fontFamily:F.arch, fontSize:15, color:T.red, marginBottom:9 }}>Analysis Failed</div>
-              <div style={{ fontFamily:F.mono, fontSize:11, color:T.muted, marginBottom:20, lineHeight:1.7 }}>{errMsg}</div>
-              <button onClick={() => setPhase("ready")} style={{ background:T.accent, color:T.bg, border:"none", borderRadius:9, padding:"10px 26px", fontFamily:F.arch, fontSize:13, cursor:"pointer" }}>Try Again</button>
+            <div style={{ background:T.red+"0e", border:"1px solid "+T.red+"40", borderRadius:13, padding:"26px 20px", textAlign:"center" }}>
+              <div style={{ fontSize:32, marginBottom:8 }}>⚠️</div>
+              <div style={{ fontFamily:F.arch, fontSize:14, color:T.red, marginBottom:8 }}>Analysis Failed</div>
+              <div style={{ fontFamily:F.mono, fontSize:11, color:T.muted, marginBottom:18, lineHeight:1.7 }}>{errMsg}</div>
+              <button onClick={() => setPhase("ready")} style={{ background:T.accent, color:T.bg, border:"none", borderRadius:9, padding:"10px 24px", fontFamily:F.arch, fontSize:13, cursor:"pointer" }}>Try Again</button>
             </div>
           )
         )}
+
+        <div style={{ textAlign:"center", fontFamily:F.mono, fontSize:9, color:"#111e2e", marginTop:8 }}>
+          Claude AI · HR Chance % · Player Headshots · BvP · Weather · Park Factor · 10,000× Monte Carlo
+        </div>
       </div>
     </div>
   );
