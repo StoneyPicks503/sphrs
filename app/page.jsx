@@ -305,10 +305,16 @@ function sanitize(s) {
   s = s.replace(/[\u201c\u201d]/g, '"').replace(/[\u2018\u2019]/g, "'");
   s = s.replace(/'([A-Za-z_][A-Za-z0-9_]{0,50})['"]\s*:/g, '"$1":');
   s = s.replace(/"([A-Za-z_][A-Za-z0-9_]{0,50})'\s*:/g, '"$1":');
+  // Fix missing commas between properties: "value" "key": → "value", "key":
+  s = s.replace(/"(\s*)"([A-Za-z_])/g, '", "$2');
+  // Fix missing commas between } and next property
+  s = s.replace(/\}(\s*)"([A-Za-z_])/g, '}, "$2');
+  // Fix missing commas between ] and next property
+  s = s.replace(/\](\s*)"([A-Za-z_])/g, '], "$2');
   // Fix Claude using parentheses () instead of brackets [] for arrays
   s = s.replace(/:\s*\(\s*\{/g, ': [{');
   s = s.replace(/\}\s*\)/g, '}]');
-  s = s.replace(/(:"players"|:"games"|:"zones")\s*\(/g, '$1[');
+  // Trailing commas
   s = s.replace(/,(\s*[}\]])/g, '$1');
   s = s.replace(/:\s*True\b/g, ': true').replace(/:\s*False\b/g, ': false').replace(/:\s*None\b/g, ': null').replace(/:\s*undefined\b/g, ': null');
   s = s.replace(/:\s*\.(\d+)/g, ': 0.$1');
@@ -719,18 +725,19 @@ function buildPrompt(games, weatherMap = {}) {
     "TODAY'S GAMES (with REAL live weather data fetched from weather API):",
     lines,
     "",
-    "REAL WEATHER AT GAME TIME (use these exact values for weatherInsight — include temp, wind vs field direction, HR impact):",
+    "REAL WEATHER PER GAME (include in weatherInsight):",
     ...games.map(g => {
       const key = g.away + g.home;
       const w = weatherMap[key];
-      if (!w) return g.away + "@" + g.home + ": Weather unavailable — estimate based on season";
-      const plateNote = w.plateFaces ? " | Home plate faces: " + w.plateFaces : "";
-      const timeNote  = " | Forecast for game time: " + g.time;
-      return g.away + "@" + g.home + " at " + g.venue + ": " + w.summary + plateNote + timeNote +
-        (w.hrImpact === "positive" ? " ✅ HR FAVORABLE" : w.hrImpact === "negative" ? " ❌ HR UNFAVORABLE" : " ➡️ NEUTRAL");
+      if (!w) return g.away + "@" + g.home + ": no weather data";
+      const plate = w.plateFaces ? w.plateFaces.split("—")[0].trim() : "";
+      return g.away + "@" + g.home + ": " + w.tempF + "F " +
+        w.windSpeed + "mph from " + w.windDir + " (" + (w.windVsField || "?") + ")" +
+        (plate ? " plate-" + plate : "") + " " + w.condition +
+        (w.hrImpact === "positive" ? " HR-BOOST" : w.hrImpact === "negative" ? " HR-SUPPRESS" : "");
     }),
     "",
-    "TASK: For EACH game return exactly 4 HR candidates from the TWO TEAMS in THAT specific game (best HR spots first — mix both teams).",
+    "TASK: For EACH game return exactly 3 HR candidates from the TWO TEAMS in THAT specific game (best HR spots first — mix both teams).",
     "CRITICAL: ONLY include POSITION PLAYERS (batters). NEVER include pitchers as HR candidates.",
     "CRITICAL: Every player MUST play for either the away team OR the home team of their specific game. No cross-game players.",
     "Do NOT list any starting pitcher, relief pitcher, or anyone listed as SP/RP/LHP/RHP as a batter.",
@@ -837,7 +844,7 @@ export default function App() {
       await new Promise(r => setTimeout(r, 150));
 
       // Split into batches of 6 to avoid token limit
-      const BATCH = 6;
+      const BATCH = 4; // Smaller batches prevent JSON truncation
       const allGameResults = [];
       const batches = [];
       for (let i = 0; i < games.length; i += BATCH) {
