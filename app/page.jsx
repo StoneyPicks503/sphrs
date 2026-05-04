@@ -744,29 +744,48 @@ function buildPrompt(games, weatherMap = {}) {
     "Players must be: outfielders, infielders, catchers, or designated hitters ONLY.",
     "Include each player's MLB MLBAM ID for headshots.",
     "",
+    "KNOWN 2026 HR TOTALS as of May 4 2026 — USE THESE EXACT NUMBERS:",
+    "Aaron Judge=14HR, Shohei Ohtani=11HR, Kyle Schwarber=10HR, Gunnar Henderson=10HR,",
+    "Pete Alonso=9HR, Yordan Alvarez=9HR, Bryce Harper=8HR, Juan Soto=8HR,",
+    "Matt Olson=8HR, Rafael Devers=8HR, Bobby Witt Jr=7HR, Vladimir Guerrero Jr=7HR,",
+    "Jose Ramirez=7HR, Mookie Betts=7HR, Freddie Freeman=7HR, Fernando Tatis Jr=7HR,",
+    "Elly De La Cruz=6HR, Julio Rodriguez=6HR, Randy Arozarena=6HR, Ian Happ=6HR,",
+    "Jarren Duran=6HR, Pete Crow-Armstrong=5HR, Alex Bregman=5HR, Willy Adames=5HR,",
+    "Byron Buxton=5HR, Nolan Arenado=5HR, Francisco Lindor=5HR, Mike Trout=4HR,",
+    "Munetaka Murakami=4HR, Nick Kurtz=4HR, Shea Langeliers=4HR, James Wood=4HR,",
+    "Jackson Chourio=4HR, Vinnie Pasquantino=4HR, Salvador Perez=4HR,",
+    "Bo Bichette=3HR, Matt Chapman=3HR, Riley Greene=3HR, Spencer Torkelson=3HR,",
+    "Jordan Walker=3HR, Ketel Marte=4HR, Corbin Carroll=3HR, William Contreras=4HR",
+    "RULE: If a player above is in today's game, use their EXACT HR count listed.",
+    "For unlisted players, estimate based on their 2026 pace and position.",
+    "",
+    "BvP vs TODAY'S PITCHER — provide career + 2026 HR stats:",
+    "- hrAllowedVsTeam: career HR this pitcher has allowed to the opposing team (integer)",
+    "- bvpSummary: include career AB, AVG, HR vs this specific pitcher if available",
+    "",
     "For each player provide (be concise):",
     "- name, team, mlbId, emoji, teamColor, isHome",
     "- hrChancePct (0-35), pitcher, pitcherHand, pitcherERA, pitcherWhip, hrAllowedVsTeam",
-    "- bvpSummary (1 sentence), homeAwaySplit (1 line), weatherInsight: cite the REAL weather data — temp°F, wind mph blowing OUT/IN/crosswind relative to the field, and HR impact rating",
-    "- seasonHRs: player actual 2026 home run total as of today (integer, e.g. 8 not null), gamesPlayed, ops, exitVelo, parkFactor",
-    "- simHRs: how many times out of 10000 simulated games this batter hits a HR off this specific pitcher today (integer 0-10000)",
-    "- hotStreak: how many HR in the player's last 7 days/10 games (integer, 0 if none, e.g. 3 means 3 HR in last 10 games)",
-    "- hotStreakNote: 1 short sentence describing their recent HR form (e.g. '3 HR in last 7 days, heating up fast')",
-    "- confidence: overall confidence 0-100. BOOST confidence by up to 10 points if player is on a hot streak (2+ HR in last 10 games).",
+    "- bvpSummary (1 sentence with career stats vs this pitcher), homeAwaySplit (1 line)",
+    "- weatherInsight: cite REAL weather — temp F, wind mph, direction vs field, HR impact",
+    "- seasonHRs (use exact number from list above), gamesPlayed, ops, exitVelo, parkFactor",
+    "- simHRs: HR hits out of 10000 simulations vs this specific pitcher today (integer)",
+    "- hotStreak: HR count in last 10 games (integer, 0 if none)",
+    "- hotStreakNote: 1 sentence on recent HR form",
+    "- confidence: 0-100, boost up to 10pts for hot streak",
     "",
     "Park HR factors: Coors=1.38 SutterHealth=1.28 Wrigley=1.14 Yankee=1.10 Fenway=1.06",
-    "Angel=1.02 Target=1.02 Busch=1.01 Comerica=1.00 Nationals=1.00 loanDepot=0.95",
-    "Tropicana=0.94 PNC=0.90 Petco=0.88 TMobile=0.85",
+    "Angel=1.02 Target=1.02 Busch=1.01 Comerica=1.00 loanDepot=0.95 Tropicana=0.94 PNC=0.90 Petco=0.88 TMobile=0.85",
     "",
-    "COMMON MLBAM IDs: Aaron Judge=592450, Shohei Ohtani=660271, Mookie Betts=605141,",
+    "MLBAM IDs: Aaron Judge=592450, Shohei Ohtani=660271, Mookie Betts=605141,",
     "Yordan Alvarez=670541, Matt Olson=621566, Kyle Schwarber=656941, Bryce Harper=547180,",
     "Gunnar Henderson=683002, Pete Alonso=624413, Juan Soto=665742, Vladimir Guerrero Jr=665489,",
     "Bo Bichette=666182, Jose Ramirez=608070, Elly De La Cruz=682829, Bobby Witt Jr=677951,",
     "Mike Trout=545361, Nolan Arenado=571448, Freddie Freeman=518692, Rafael Devers=646240,",
-    "Fernando Tatis Jr=665487, Francisco Lindor=596019, Kyle Schwarber=656941,",
-    "James Wood=694192, Byron Buxton=621439, Randy Arozarena=668227, Ian Happ=664023,",
-    "Pete Crow-Armstrong=682998, Julio Rodriguez=677594, Shea Langeliers=669127,",
-    "Willy Adames=642715, Matt Chapman=656305, Jarren Duran=680776, Alex Bregman=608324",
+    "Fernando Tatis Jr=665487, Francisco Lindor=596019, James Wood=694192, Byron Buxton=621439,",
+    "Randy Arozarena=668227, Ian Happ=664023, Pete Crow-Armstrong=682998, Julio Rodriguez=677594,",
+    "Shea Langeliers=669127, Willy Adames=642715, Matt Chapman=656305, Jarren Duran=680776,",
+    "Alex Bregman=608324, Jackson Chourio=682626, Munetaka Murakami=673548, Nick Kurtz=695373",
     "",
     "CRITICAL JSON RULES: Use ONLY double-quotes. Start with { end with }. No other text.",
     "",
@@ -931,6 +950,21 @@ export default function App() {
         verifyChecks = uniqueForVerify.map((_, i) => ({ i, ok: true, hotStreak: false, hotNote: "" }));
       }
 
+      // Known 2026 HR totals — used to correct wrong values from Claude
+      const KNOWN_2026_HR = {
+        "Aaron Judge":14,"Shohei Ohtani":11,"Kyle Schwarber":10,"Gunnar Henderson":10,
+        "Pete Alonso":9,"Yordan Alvarez":9,"Bryce Harper":8,"Juan Soto":8,
+        "Matt Olson":8,"Rafael Devers":8,"Bobby Witt Jr":7,"Vladimir Guerrero Jr":7,
+        "Jose Ramirez":7,"Mookie Betts":7,"Freddie Freeman":7,"Fernando Tatis Jr":7,
+        "Elly De La Cruz":6,"Julio Rodriguez":6,"Randy Arozarena":6,"Ian Happ":6,
+        "Jarren Duran":6,"Pete Crow-Armstrong":5,"Alex Bregman":5,"Willy Adames":5,
+        "Byron Buxton":5,"Nolan Arenado":5,"Francisco Lindor":5,"Mike Trout":4,
+        "Munetaka Murakami":4,"Nick Kurtz":4,"Shea Langeliers":4,"James Wood":4,
+        "Jackson Chourio":4,"Vinnie Pasquantino":4,"Salvador Perez":4,
+        "Bo Bichette":3,"Matt Chapman":3,"Riley Greene":3,"Spencer Torkelson":3,
+        "Jordan Walker":3,"Ketel Marte":4,"Corbin Carroll":3,"William Contreras":4,
+      };
+
       // Build lookup maps from verification results
       const flaggedNames = new Set(
         verifyChecks.filter(c => c.ok === false).map(c => c.name)
@@ -981,10 +1015,17 @@ export default function App() {
           // 4. Attach hot streak data + boost score
           .map(p => {
             const isHot = !!hotStreakMap[p.name];
+            // Correct 2026 HR count if we have the real number
+            const knownHR = KNOWN_2026_HR[p.name];
+            const correctedHR = knownHR != null ? knownHR : (p.seasonHRs ?? null);
+            // Validate simHRs is reasonable (0-4000 range for most players)
+            const validSims = (p.simHRs != null && p.simHRs >= 0 && p.simHRs <= 5000)
+              ? p.simHRs : null;
             return {
               ...p,
-              // Lock team to match isHome flag vs game teams
               team: p.isHome ? teams.home : teams.away,
+              seasonHRs: correctedHR,
+              simHRs: validSims,
               hotStreak: isHot,
               hotNote: hotStreakMap[p.name] || "",
               hrChancePct: isHot
