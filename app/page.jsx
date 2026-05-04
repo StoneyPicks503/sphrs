@@ -1106,31 +1106,51 @@ export default function App() {
         const validTeams = new Set([teams.away, teams.home]);
 
         const cleanPlayers = (gr.players ?? [])
-          // 1. HARD: player's team must be one of the two teams in this exact game
+          // 1. Team validation — only remove if we KNOW the player is on wrong team
           .filter(p => {
-            if (!p.team) return false;
-            // Check PLAYER_TEAMS lookup first — most reliable source
-            const knownTeam = PLAYER_TEAMS[p.name] || PLAYER_TEAMS[p.name.replace(" Jr.", " Jr")];
+            if (!p.team) { p.team = teams.away; return true; } // give benefit of doubt
+
+            // Fuzzy name match in PLAYER_TEAMS — try full name, no-suffix, trimmed
+            const variants = [
+              p.name,
+              p.name.replace(/\s+Jr\.?$/i, "").trim(),
+              p.name.replace(/\s+Sr\.?$/i, "").trim(),
+              p.name.split(" ").slice(0, 2).join(" "), // first + last only
+            ];
+            let knownTeam = null;
+            for (const v of variants) {
+              if (PLAYER_TEAMS[v]) { knownTeam = PLAYER_TEAMS[v]; break; }
+            }
+
             if (knownTeam) {
               if (!validTeams.has(knownTeam)) {
-                pushLog("⚠️ " + p.name + " plays for " + knownTeam + " not in " + teams.away + "@" + teams.home + " — removed");
+                // 100% certain wrong game — remove
+                pushLog("⚠️ " + p.name + " is on " + knownTeam + " not playing in " + teams.away + "@" + teams.home);
                 return false;
               }
-              // Correct the team if Claude got it wrong within the game
+              // Correct team/isHome assignment
               p.team = knownTeam;
               p.isHome = knownTeam === teams.home;
               return true;
             }
-            // Fallback: check if Claude-provided team is valid for this game
+
+            // Player not in our lookup — allow through if Claude's team is valid
+            // Don't remove unknowns or we lose too many players
             if (validTeams.has(p.team)) return true;
-            pushLog("⚠️ " + p.name + " (" + p.team + ") not in " + teams.away + "@" + teams.home + " — removed");
-            return false;
+            // If Claude assigned an invalid team, correct it to the more likely team
+            // based on isHome flag rather than removing the player entirely
+            p.team = p.isHome ? teams.home : teams.away;
+            return true;
           })
-          // 2. Remove flagged (pitchers / wrong roster)
+          // 2. Remove confirmed pitchers from verification pass
           .filter(p => !flaggedNames.has(p.name))
-          // 3. Global dedup — same player can't appear in two different games
+          // 3. Global dedup — prevent same player in two games
           .filter(p => {
-            const key2 = p.name.toLowerCase().trim();
+            // Use fuzzy key so "Bobby Witt" and "Bobby Witt Jr" count as same
+            const key2 = p.name.toLowerCase().trim()
+              .replace(/\s+jr\.?$/i, "")
+              .replace(/\s+sr\.?$/i, "")
+              .trim();
             if (seenPlayers.has(key2)) return false;
             seenPlayers.add(key2);
             return true;
