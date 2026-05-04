@@ -236,12 +236,17 @@ function PlayerRow({ p, rank, delay = 0 }) {
           </div>
         </div>
 
-        {/* HR % big number */}
+        {/* HR % + sim count */}
         <div style={{ textAlign: "right", flexShrink: 0 }}>
-          <div style={{ fontFamily: F.bebas, fontSize: 28, color: c, lineHeight: 1, textShadow: glow }}>
+          <div style={{ fontFamily: F.bebas, fontSize: 26, color: c, lineHeight: 1, textShadow: glow }}>
             {hrPct.toFixed(1)}%
           </div>
-          <div style={{ fontFamily: F.mono, fontSize: 8, color: T.muted }}>HR CHANCE</div>
+          <div style={{ fontFamily: F.mono, fontSize: 8, color: T.muted, marginBottom: 2 }}>HR CHANCE</div>
+          {p.simHRs != null && (
+            <div style={{ fontFamily: F.mono, fontSize: 8, color: c, background: c + "15", border: "1px solid " + c + "30", borderRadius: 4, padding: "1px 5px", textAlign: "center" }}>
+              {p.simHRs.toLocaleString()}<span style={{ color: T.muted }}>/10k</span>
+            </div>
+          )}
         </div>
 
         {/* Expand arrow */}
@@ -252,11 +257,28 @@ function PlayerRow({ p, rank, delay = 0 }) {
       {expanded && (
         <div style={{ padding: "0 12px 12px 12px", borderTop: "1px solid " + T.border }}>
           <div style={{ marginTop: 10, display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+            {/* 2026 HR count — prominent banner */}
+            <div style={{ width: "100%", background: "rgba(0,229,255,0.08)", border: "1px solid rgba(0,229,255,0.3)", borderRadius: 7, padding: "5px 10px", marginBottom: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontFamily: F.mono, fontSize: 9, color: T.muted }}>2026 SEASON</span>
+              <span style={{ fontFamily: F.arch, fontSize: 13, color: T.accent }}>
+                {p.seasonHRs ?? "—"} HR
+                <span style={{ fontFamily: F.mono, fontSize: 9, color: T.muted, marginLeft: 6 }}>in {p.gamesPlayed ?? "—"} games</span>
+              </span>
+            </div>
+            {/* Sim result banner */}
+            {p.simHRs != null && (
+              <div style={{ width: "100%", background: "rgba(0,230,118,0.08)", border: "1px solid rgba(0,230,118,0.3)", borderRadius: 7, padding: "5px 10px", marginBottom: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontFamily: F.mono, fontSize: 9, color: T.muted }}>10,000 SIM RESULT</span>
+                <span style={{ fontFamily: F.arch, fontSize: 13, color: "#00e676" }}>
+                  {p.simHRs.toLocaleString()} HR hits
+                  <span style={{ fontFamily: F.mono, fontSize: 9, color: T.muted, marginLeft: 6 }}>vs {p.pitcher}</span>
+                </span>
+              </div>
+            )}
             {[
               ["vs", p.pitcher + " (" + p.pitcherHand + ") ERA " + (p.pitcherERA ?? "N/A"), T.amber],
               ["WHIP", p.pitcherWhip ?? "-", p.pitcherWhip && p.pitcherWhip > 1.4 ? "#00e676" : T.text],
               ["HA vs TEAM", p.hrAllowedVsTeam != null ? p.hrAllowedVsTeam + " HR" : "-", p.hrAllowedVsTeam > 2 ? "#00e676" : T.text],
-              ["2026", (p.seasonHRs ?? "-") + " HR / " + (p.gamesPlayed ?? "-") + "g", T.accent],
               ["OPS", p.ops ?? "-", T.text],
               ["EV", p.exitVelo ? p.exitVelo + "mph" : "-", T.text],
               ["PARK×", p.parkFactor ?? "-", T.text],
@@ -460,13 +482,18 @@ function buildPrompt(games) {
     lines,
     "",
     "TASK: For EACH game return the top 3 HR candidates only (best HR spots from either team).",
+    "CRITICAL: ONLY include POSITION PLAYERS (batters). NEVER include pitchers as HR candidates.",
+    "Do NOT list any starting pitcher, relief pitcher, or anyone listed as SP/RP/LHP/RHP as a batter.",
+    "Players must be: outfielders, infielders, catchers, or designated hitters ONLY.",
     "Include each player's MLB MLBAM ID for headshots.",
     "",
     "For each player provide (be concise):",
     "- name, team, mlbId, emoji, teamColor, isHome",
     "- hrChancePct (0-35), pitcher, pitcherHand, pitcherERA, pitcherWhip, hrAllowedVsTeam",
     "- bvpSummary (1 sentence), homeAwaySplit (1 line), weatherInsight (1 sentence)",
-    "- seasonHRs, gamesPlayed, ops, exitVelo, parkFactor, simHRs (out of 10000), confidence",
+    "- seasonHRs: player actual 2026 home run total as of today (integer, e.g. 8 not null), gamesPlayed, ops, exitVelo, parkFactor",
+    "- simHRs: how many times out of 10000 simulated games this batter hits a HR off this specific pitcher today (integer 0-10000)",
+    "- confidence: overall confidence 0-100",
     "",
     "Park HR factors: Coors=1.38 SutterHealth=1.28 Wrigley=1.14 Yankee=1.10 Fenway=1.06",
     "Angel=1.02 Target=1.02 Busch=1.01 Comerica=1.00 Nationals=1.00 loanDepot=0.95",
