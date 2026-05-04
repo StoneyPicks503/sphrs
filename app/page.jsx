@@ -225,14 +225,21 @@ function PlayerRow({ p, rank, delay = 0 }) {
 
         {/* Name + team */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: F.arch, fontSize: 13, color: T.text, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {p.name}
+          <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
+            <span style={{ fontFamily: F.arch, fontSize: 13, color: T.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {p.name}
+            </span>
+            {p.hotStreak >= 3 && <span style={{ fontSize: 12, flexShrink: 0 }} title={p.hotStreakNote}>🔥🔥</span>}
+            {p.hotStreak > 0 && p.hotStreak < 3 && <span style={{ fontSize: 11, flexShrink: 0 }} title={p.hotStreakNote}>🔥</span>}
           </div>
-          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}>
             <span style={{ fontFamily: F.mono, fontSize: 9, color: T.muted }}>{p.team}</span>
             {p.isHome
               ? <span style={{ fontFamily: F.mono, fontSize: 9, color: T.green }}>🏠 HOME</span>
               : <span style={{ fontFamily: F.mono, fontSize: 9, color: T.teal }}>✈ AWAY</span>}
+            {p.seasonHRs != null && (
+              <span style={{ fontFamily: F.mono, fontSize: 9, color: T.accent }}>{p.seasonHRs} HR</span>
+            )}
           </div>
         </div>
 
@@ -305,9 +312,26 @@ function PlayerRow({ p, rank, delay = 0 }) {
               {p.isHome ? "🏠" : "✈"} {p.homeAwaySplit}
             </div>
           )}
+          {p.hotStreak && p.hotNote && (
+            <div style={{ fontFamily: F.mono, fontSize: 9, color: "#ff6b00", background: "rgba(255,107,0,0.1)", border: "1px solid rgba(255,107,0,0.35)", borderRadius: 6, padding: "5px 8px", marginBottom: 5, lineHeight: 1.5 }}>
+              🔥 HOT STREAK: {p.hotNote}
+            </div>
+          )}
           {p.weatherInsight && (
             <div style={{ fontFamily: F.mono, fontSize: 9, color: T.green + "cc", background: "rgba(0,230,118,0.07)", border: "1px solid rgba(0,230,118,0.25)", borderRadius: 6, padding: "5px 8px", lineHeight: 1.5 }}>
               🌤 {p.weatherInsight}
+            </div>
+          )}
+          {/* Hot streak banner */}
+          {p.hotStreak > 0 && (
+            <div style={{ fontFamily: F.mono, fontSize: 9, lineHeight: 1.5, marginTop: 4,
+              background: p.hotStreak >= 3 ? "rgba(255,100,0,0.12)" : "rgba(255,200,0,0.08)",
+              border: "1px solid " + (p.hotStreak >= 3 ? "rgba(255,100,0,0.4)" : "rgba(255,200,0,0.3)"),
+              borderRadius: 6, padding: "5px 8px",
+              color: p.hotStreak >= 3 ? "#ff6600" : T.amber + "cc",
+            }}>
+              {p.hotStreak >= 3 ? "🔥🔥" : "🔥"} HOT STREAK — {p.hotStreak} HR in last 10 games
+              {p.hotStreakNote && <span style={{ color: T.muted, marginLeft: 4 }}>· {p.hotStreakNote}</span>}
             </div>
           )}
         </div>
@@ -493,7 +517,9 @@ function buildPrompt(games) {
     "- bvpSummary (1 sentence), homeAwaySplit (1 line), weatherInsight (1 sentence)",
     "- seasonHRs: player actual 2026 home run total as of today (integer, e.g. 8 not null), gamesPlayed, ops, exitVelo, parkFactor",
     "- simHRs: how many times out of 10000 simulated games this batter hits a HR off this specific pitcher today (integer 0-10000)",
-    "- confidence: overall confidence 0-100",
+    "- hotStreak: how many HR in the player's last 7 days/10 games (integer, 0 if none, e.g. 3 means 3 HR in last 10 games)",
+    "- hotStreakNote: 1 short sentence describing their recent HR form (e.g. '3 HR in last 7 days, heating up fast')",
+    "- confidence: overall confidence 0-100. BOOST confidence by up to 10 points if player is on a hot streak (2+ HR in last 10 games).",
     "",
     "Park HR factors: Coors=1.38 SutterHealth=1.28 Wrigley=1.14 Yankee=1.10 Fenway=1.06",
     "Angel=1.02 Target=1.02 Busch=1.01 Comerica=1.00 Nationals=1.00 loanDepot=0.95",
@@ -589,19 +615,107 @@ export default function App() {
         pushLog("✅ Batch " + (b + 1) + " done — " + batchResults.length + " games analyzed");
       }
 
-      // Map all results to game keys
+      // ── VERIFICATION PASS ─────────────────────────────────────────────────
+      pushLog("🔍 Verifying positions, rosters & hot streaks...");
+
+      // Collect ALL players across all games
+      const allPlayers = [];
+      allGameResults.forEach(gr => {
+        (gr.players ?? []).forEach(p => {
+          allPlayers.push({ name: p.name, team: p.team, gameKey: gr.away + gr.home });
+        });
+      });
+
+      // Deduplicate by name BEFORE verification to save tokens
+      const uniqueNames = new Set();
+      const uniqueForVerify = allPlayers.filter(p => {
+        if (uniqueNames.has(p.name)) return false;
+        uniqueNames.add(p.name);
+        return true;
+      });
+
+      const vList = uniqueForVerify.map((p, i) =>
+        (i + 1) + ". " + p.name + " | team: " + p.team
+      ).join("\n");
+
+      const verifyPrompt = [
+        "You are an MLB expert. Today is May 4 2026.",
+        "Verify each player. Check ALL of these:",
+        "1. POSITION PLAYER ONLY — flag any pitcher (SP/RP). Pitchers CANNOT be HR candidates.",
+        "2. CORRECT TEAM — flag if on wrong team. Key 2026 moves:",
+        "   Pete Alonso=BAL, Juan Soto=NYM, Max Fried=NYY, Paul Goldschmidt=NYY,",
+        "   Cody Bellinger=NYY, Rafael Devers=SF, Willy Adames=SF, Alex Bregman=BOS,",
+        "   Randy Arozarena=SEA, Shohei Ohtani=LAD, Munetaka Murakami=CWS.",
+        "3. ACTIVE ROSTER — flag if on IL or in minors.",
+        "4. HOT STREAK — note if player has hit HR in 2+ of last 5 games (true/false + brief note).",
+        "",
+        "Players:",
+        vList,
+        "",
+        "Return ONLY a JSON array. Start with [ end with ]. No other text.",
+        '[{"i":0,"name":"Aaron Judge","ok":true,"reason":"","hotStreak":true,"hotNote":"HR in 3 of last 5 games"},',
+        '{"i":1,"name":"Max Fried","ok":false,"reason":"Pitcher — not a batter","hotStreak":false,"hotNote":""}]',
+      ].join("\n");
+
+      let verifyChecks = [];
+      try {
+        const vRaw = await callClaude(verifyPrompt, 3000);
+        const vParsed = grabJSON(vRaw);
+        verifyChecks = Array.isArray(vParsed) ? vParsed : [];
+
+        const flagged = verifyChecks.filter(c => c.ok === false);
+        const hotPlayers = verifyChecks.filter(c => c.hotStreak === true);
+
+        if (flagged.length > 0) {
+          flagged.forEach(f => pushLog("⚠️ Removed " + f.name + " — " + (f.reason || "failed check")));
+        }
+        if (hotPlayers.length > 0) {
+          pushLog("🔥 Hot streaks: " + hotPlayers.map(h => h.name).join(", "));
+        }
+        if (flagged.length === 0) {
+          pushLog("✅ All players verified — position players on correct 2026 rosters");
+        }
+      } catch (_) {
+        pushLog("⚠️ Verification inconclusive — using original picks");
+        verifyChecks = uniqueForVerify.map((_, i) => ({ i, ok: true, hotStreak: false, hotNote: "" }));
+      }
+
+      // Build lookup maps from verification results
+      const flaggedNames = new Set(
+        verifyChecks.filter(c => c.ok === false).map(c => c.name)
+      );
+      const hotStreakMap = {};
+      verifyChecks.forEach(c => {
+        if (c.hotStreak) hotStreakMap[c.name] = c.hotNote || "Hot streak";
+      });
+
+      // Map results — remove flagged, deduplicate across ALL games, boost hot streaks
+      const seenPlayers = new Set();
       const newResults = {};
       allGameResults.forEach(gr => {
         const key = gr.away + gr.home;
-        const players = (gr.players ?? []).sort((a, b) => (b.hrChancePct ?? 0) - (a.hrChancePct ?? 0));
-        newResults[key] = { players };
+        const cleanPlayers = (gr.players ?? [])
+          .filter(p => !flaggedNames.has(p.name))        // remove pitchers / wrong team
+          .filter(p => {                                   // global dedup — no player twice
+            if (seenPlayers.has(p.name.toLowerCase())) return false;
+            seenPlayers.add(p.name.toLowerCase());
+            return true;
+          })
+          .map(p => ({
+            ...p,
+            hotStreak: !!hotStreakMap[p.name],
+            hotNote: hotStreakMap[p.name] || "",
+            // Boost hrChancePct by up to 3% for hot streak players
+            hrChancePct: p.hotStreak || hotStreakMap[p.name]
+              ? Math.min(35, (p.hrChancePct ?? 0) + 2.5)
+              : (p.hrChancePct ?? 0),
+          }))
+          .sort((a, b) => (b.hrChancePct ?? 0) - (a.hrChancePct ?? 0));
+        newResults[key] = { players: cleanPlayers };
       });
 
       setResults(newResults);
-
-      // Auto-open all analyzed games
       setOpenGames(new Set(games.map(g => g.away + g.home)));
-
       pushLog("✅ All " + allGameResults.length + " games analyzed! Click any game to see HR %.");
       setPhase("done");
 
