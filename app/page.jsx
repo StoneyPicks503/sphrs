@@ -965,6 +965,70 @@ export default function App() {
         "Jordan Walker":3,"Ketel Marte":4,"Corbin Carroll":3,"William Contreras":4,
       };
 
+      // Known 2026 player→team — used to catch wrong-team assignments
+      const PLAYER_TEAMS = {
+        // NYM
+        "Juan Soto":"NYM","Francisco Lindor":"NYM","Mark Vientos":"NYM","Brandon Nimmo":"NYM","Jeff McNeil":"NYM",
+        // COL
+        "Ezequiel Tovar":"COL","Brenton Doyle":"COL","Ryan McMahon":"COL","Charlie Blackmon":"COL",
+        // PHI
+        "Bryce Harper":"PHI","Kyle Schwarber":"PHI","Trea Turner":"PHI","Nick Castellanos":"PHI","J.T. Realmuto":"PHI","JT Realmuto":"PHI",
+        // MIA
+        "Jorge Soler":"MIA","Luis Arraez":"MIA","Jake Burger":"MIA","Connor Norby":"MIA",
+        // TOR
+        "Vladimir Guerrero Jr":"TOR","Bo Bichette":"TOR","George Springer":"TOR","Daulton Varsho":"TOR",
+        // TB
+        "Junior Caminero":"TB","Josh Lowe":"TB","Yandy Diaz":"TB","Christopher Morel":"TB",
+        // BOS
+        "Alex Bregman":"BOS","Jarren Duran":"BOS","Triston Casas":"BOS","Masataka Yoshida":"BOS","Rob Refsnyder":"BOS","Wilyer Abreu":"BOS",
+        // DET
+        "Spencer Torkelson":"DET","Riley Greene":"DET","Kerry Carpenter":"DET","Zach McKinstry":"DET","Matt Vierling":"DET",
+        // CIN
+        "Elly De La Cruz":"CIN","Tyler Stephenson":"CIN","Jonathan India":"CIN","TJ Friedl":"CIN",
+        // CHC
+        "Ian Happ":"CHC","Pete Crow-Armstrong":"CHC","Seiya Suzuki":"CHC","Michael Busch":"CHC","Dansby Swanson":"CHC",
+        // BAL
+        "Gunnar Henderson":"BAL","Pete Alonso":"BAL","Cedric Mullins":"BAL","Adley Rutschman":"BAL","Anthony Santander":"BAL","Colton Cowser":"BAL",
+        // NYY
+        "Aaron Judge":"NYY","Paul Goldschmidt":"NYY","Cody Bellinger":"NYY","Jazz Chisholm":"NYY","Anthony Volpe":"NYY","Gleyber Torres":"NYY","Austin Wells":"NYY",
+        // CLE
+        "Jose Ramirez":"CLE","Steven Kwan":"CLE","Josh Naylor":"CLE","Lane Thomas":"CLE","David Fry":"CLE",
+        // KC
+        "Bobby Witt Jr":"KC","Vinnie Pasquantino":"KC","Salvador Perez":"KC","MJ Melendez":"KC","Hunter Renfroe":"KC",
+        // MIL
+        "Jackson Chourio":"MIL","William Contreras":"MIL","Christian Yelich":"MIL","Joey Wiemer":"MIL","Rhys Hoskins":"MIL",
+        // STL
+        "Nolan Arenado":"STL","Jordan Walker":"STL","Lars Nootbaar":"STL","Brendan Donovan":"STL","Paul DeJong":"STL",
+        // LAD
+        "Shohei Ohtani":"LAD","Mookie Betts":"LAD","Freddie Freeman":"LAD","Will Smith":"LAD","Teoscar Hernandez":"LAD","Max Muncy":"LAD","Gavin Lux":"LAD",
+        // HOU
+        "Yordan Alvarez":"HOU","Jose Altuve":"HOU","Kyle Tucker":"HOU","Yainer Diaz":"HOU","Chas McCormick":"HOU","Jeremy Pena":"HOU",
+        // CWS
+        "Munetaka Murakami":"CWS","Andrew Vaughn":"CWS","Eloy Jimenez":"CWS","Korey Lee":"CWS",
+        // LAA
+        "Mike Trout":"LAA","Taylor Ward":"LAA","Zach Neto":"LAA","Logan O'Hoppe":"LAA","Kevin Pillar":"LAA",
+        // ATL
+        "Matt Olson":"ATL","Austin Riley":"ATL","Ozzie Albies":"ATL","Sean Murphy":"ATL","Michael Harris II":"ATL","Ronald Acuna Jr":"ATL",
+        // SEA
+        "Julio Rodriguez":"SEA","Randy Arozarena":"SEA","Cal Raleigh":"SEA","Luke Raley":"SEA","Mitch Garver":"SEA",
+        // SD
+        "Fernando Tatis Jr":"SD","Manny Machado":"SD","Jake Cronenworth":"SD","Ha-Seong Kim":"SD","Jackson Merrill":"SD",
+        // SF
+        "Rafael Devers":"SF","Willy Adames":"SF","Matt Chapman":"SF","Heliot Ramos":"SF","Mike Yastrzemski":"SF","Patrick Bailey":"SF",
+        // ATH
+        "Nick Kurtz":"ATH","Shea Langeliers":"ATH","Brent Rooker":"ATH","JJ Bleday":"ATH",
+        // WSH
+        "James Wood":"WSH","CJ Abrams":"WSH","Keibert Ruiz":"WSH","Jesse Winker":"WSH",
+        // MIN
+        "Byron Buxton":"MIN","Carlos Correa":"MIN","Ryan Jeffers":"MIN","Matt Wallner":"MIN","Edouard Julien":"MIN",
+        // TEX
+        "Nathaniel Lowe":"TEX","Adolis Garcia":"TEX","Jonah Heim":"TEX","Wyatt Langford":"TEX",
+        // PIT
+        "Oneil Cruz":"PIT","Bryan Reynolds":"PIT","Andrew McCutchen":"PIT","Nick Gonzales":"PIT",
+        // AZ
+        "Ketel Marte":"AZ","Corbin Carroll":"AZ","Christian Walker":"AZ","Lourdes Gurriel Jr":"AZ",
+      };
+
       // Build lookup maps from verification results
       const flaggedNames = new Set(
         verifyChecks.filter(c => c.ok === false).map(c => c.name)
@@ -999,6 +1063,19 @@ export default function App() {
           // 1. HARD: player's team must be one of the two teams in this exact game
           .filter(p => {
             if (!p.team) return false;
+            // Check PLAYER_TEAMS lookup first — most reliable source
+            const knownTeam = PLAYER_TEAMS[p.name] || PLAYER_TEAMS[p.name.replace(" Jr.", " Jr")];
+            if (knownTeam) {
+              if (!validTeams.has(knownTeam)) {
+                pushLog("⚠️ " + p.name + " plays for " + knownTeam + " not in " + teams.away + "@" + teams.home + " — removed");
+                return false;
+              }
+              // Correct the team if Claude got it wrong within the game
+              p.team = knownTeam;
+              p.isHome = knownTeam === teams.home;
+              return true;
+            }
+            // Fallback: check if Claude-provided team is valid for this game
             if (validTeams.has(p.team)) return true;
             pushLog("⚠️ " + p.name + " (" + p.team + ") not in " + teams.away + "@" + teams.home + " — removed");
             return false;
@@ -1075,7 +1152,7 @@ export default function App() {
           ⚾ SPHRS
         </div>
         <div style={{ fontFamily:F.mono, fontSize:10, color:"#8ab4d4", marginTop:3 }}>
-          HR CHANCE % · PLAYER HEADSHOTS · GAME ACCORDIONS · 10,000× MONTE CARLO
+          WEATHER CHECK · DAY/NIGHT BA · BvP AVERAGE · 10,000× MONTE CARLO
         </div>
       </div>
 
@@ -1145,7 +1222,7 @@ export default function App() {
               <Spin size={26} />
               <div>
                 <div style={{ fontFamily:F.arch, fontSize:14, color:T.accent }}>Analyzing {games.length} games...</div>
-                <div style={{ fontFamily:F.mono, fontSize:10, color:T.muted }}>BvP · HR % · Headshots · Weather · 10,000× Monte Carlo</div>
+                <div style={{ fontFamily:F.mono, fontSize:10, color:T.muted }}>BvP Avg · Day/Night BA · Weather Check · 10,000× Monte Carlo</div>
               </div>
             </div>
             <div style={{ borderTop:"1px solid "+T.border, paddingTop:10 }}>
@@ -1172,7 +1249,7 @@ export default function App() {
         )}
 
         <div style={{ textAlign:"center", fontFamily:F.mono, fontSize:9, color:"#2a4060", marginTop:8 }}>
-          Claude AI · HR Chance % · Player Headshots · BvP · Weather · Park Factor · 10,000× Monte Carlo
+          Claude AI · Weather Check · Day/Night BA · BvP Average · Park Factor · 10,000× Monte Carlo
         </div>
       </div>
     </div>
