@@ -328,6 +328,39 @@ async function fetchLiveHRStats(playerNames) {
   return hrMap;
 }
 
+/* ── Live MLB Injury Report ── */
+async function fetchInjuredPlayers() {
+  const injured = new Set();
+  try {
+    // MLB Stats API injuries endpoint
+    const url = "https://statsapi.mlb.com/api/v1/injuries?sportId=1&fields=injuries,player,fullName,injuryStatus,returnDate";
+    const r = await fetch(url);
+    if (!r.ok) throw new Error("MLB injury API " + r.status);
+    const d = await r.json();
+    const entries = d.injuries ?? [];
+    entries.forEach(e => {
+      const name   = e.player?.fullName;
+      const status = (e.injuryStatus || "").toLowerCase();
+      // Only exclude players definitely out (10-day IL, 60-day IL, DTD means they may play)
+      if (name && (status.includes("10-day") || status.includes("60-day") || status.includes("il") || status.includes("injured"))) {
+        injured.add(name);
+        // also store short version
+        const short = name.replace(/\s+Jr\.?$|\s+Sr\.?$/i, "").trim();
+        if (short !== name) injured.add(short);
+      }
+    });
+    console.log("✅ Injury report loaded —", injured.size, "players on IL");
+  } catch (e) {
+    console.warn("⚠️ Injury fetch failed:", e.message);
+    // Hardcode any known IL players today as fallback
+    const knownIL = [
+      "Ronald Acuna Jr", "Ronald Acuna", "Julio Rodriguez", "Jazz Chisholm Jr",
+    ];
+    knownIL.forEach(n => injured.add(n));
+  }
+  return injured;
+}
+
 /* ── JSON helpers ── */
 function sanitize(s) {
   s = s.replace(/[\u201c\u201d]/g, '"').replace(/[\u2018\u2019]/g, "'");
@@ -767,6 +800,8 @@ function buildPrompt(games, weatherMap = {}) {
     "",
     "TASK: For EACH game return exactly 3 HR candidates from the TWO TEAMS in THAT specific game (best HR spots first — mix both teams).",
     "CRITICAL: ONLY include POSITION PLAYERS (batters). NEVER include pitchers as HR candidates.",
+    "CRITICAL: Do NOT include any player who is on the Injured List (IL) or listed as Day-To-Day (DTD).",
+    "Do NOT suggest: Ronald Acuna Jr, any player known to be injured heading into May 4 2026.",
     "CRITICAL: Every player MUST play for either the away team OR the home team of their specific game. No cross-game players.",
     "Do NOT list any starting pitcher, relief pitcher, or anyone listed as SP/RP/LHP/RHP as a batter.",
     "Players must be: outfielders, infielders, catchers, or designated hitters ONLY.",
@@ -889,6 +924,13 @@ export default function App() {
         pushLog("⚠️ Live HR fetch failed — using verified fallback counts");
       }
 
+      // ── Fetch live injury report ──
+      pushLog("🏥 Checking MLB injury report...");
+      const injuredPlayers = await fetchInjuredPlayers();
+      if (injuredPlayers.size > 0) {
+        pushLog("🏥 " + injuredPlayers.size + " players on IL — will be excluded from picks");
+      }
+
       // Log any standout weather
       Object.entries(weatherMap).forEach(([k, w]) => {
         if (w && w.hrImpact === "positive") pushLog("🌬️ HR weather boost: " + k + " — " + w.summary);
@@ -951,7 +993,8 @@ export default function App() {
         "You are an MLB expert. Today is May 4 2026.",
         "Verify each player. Check ALL of these:",
         "1. POSITION PLAYER ONLY — flag any pitcher (SP/RP). Pitchers CANNOT be HR candidates.",
-        "2. CORRECT TEAM — flag if on wrong team. Key 2026 moves:",
+        "2. NOT INJURED — flag anyone currently on the MLB Injured List (10-day or 60-day IL) as of May 4 2026.",
+        "3. CORRECT TEAM — flag if on wrong team. Key 2026 moves:",
         "   Pete Alonso=BAL, Juan Soto=NYM, Max Fried=NYY, Paul Goldschmidt=NYY,",
         "   Cody Bellinger=NYY, Rafael Devers=SF, Willy Adames=SF, Alex Bregman=BOS,",
         "   Randy Arozarena=SEA, Shohei Ohtani=LAD, Munetaka Murakami=CWS.",
@@ -1144,6 +1187,17 @@ export default function App() {
           })
           // 2. Remove confirmed pitchers from verification pass
           .filter(p => !flaggedNames.has(p.name))
+          // 3. Remove injured players (on IL)
+          .filter(p => {
+            const variants = [
+              p.name,
+              p.name.replace(/\s+Jr\.?$/i, "").trim(),
+              p.name.replace(/\s+Sr\.?$/i, "").trim(),
+            ];
+            const isInjured = variants.some(v => injuredPlayers.has(v));
+            if (isInjured) pushLog("🏥 " + p.name + " on IL — removed from picks");
+            return !isInjured;
+          })
           // 3. Global dedup — prevent same player in two games
           .filter(p => {
             // Use fuzzy key so "Bobby Witt" and "Bobby Witt Jr" count as same
