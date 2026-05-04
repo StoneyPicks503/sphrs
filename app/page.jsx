@@ -300,6 +300,34 @@ async function fetchWeatherForGames(games) {
   return weatherMap;
 }
 
+/* ── Live 2026 HR stats from MLB Stats API ── */
+async function fetchLiveHRStats(playerNames) {
+  const hrMap = {};
+  try {
+    // MLB Stats API — free, no key needed
+    // Fetch season batting stats sorted by HR for 2026
+    const url = "https://statsapi.mlb.com/api/v1/stats?stats=season&group=hitting&season=2026&sortStat=homeRuns&limit=200&fields=stats,splits,stat,homeRuns,player,fullName";
+    const r = await fetch(url);
+    if (!r.ok) throw new Error("MLB API " + r.status);
+    const d = await r.json();
+    const splits = d.stats?.[0]?.splits ?? [];
+    splits.forEach(s => {
+      const name = s.player?.fullName;
+      const hr   = s.stat?.homeRuns;
+      if (name && hr != null) {
+        hrMap[name] = hr;
+        // Also store without Jr./Sr. suffix variants
+        const short = name.replace(/\s+Jr\.?$|\s+Sr\.?$/i, "").trim();
+        if (short !== name) hrMap[short] = hr;
+      }
+    });
+    console.log("✅ Live HR stats loaded:", Object.keys(hrMap).length, "players");
+  } catch (e) {
+    console.warn("⚠️ Live HR fetch failed:", e.message, "— using hardcoded fallback");
+  }
+  return hrMap;
+}
+
 /* ── JSON helpers ── */
 function sanitize(s) {
   s = s.replace(/[\u201c\u201d]/g, '"').replace(/[\u2018\u2019]/g, "'");
@@ -744,20 +772,21 @@ function buildPrompt(games, weatherMap = {}) {
     "Players must be: outfielders, infielders, catchers, or designated hitters ONLY.",
     "Include each player's MLB MLBAM ID for headshots.",
     "",
-    "KNOWN 2026 HR TOTALS as of May 4 2026 — USE THESE EXACT NUMBERS:",
-    "Aaron Judge=14HR, Shohei Ohtani=11HR, Kyle Schwarber=10HR, Gunnar Henderson=10HR,",
-    "Pete Alonso=9HR, Yordan Alvarez=9HR, Bryce Harper=8HR, Juan Soto=8HR,",
-    "Matt Olson=8HR, Rafael Devers=8HR, Bobby Witt Jr=7HR, Vladimir Guerrero Jr=7HR,",
-    "Jose Ramirez=7HR, Mookie Betts=7HR, Freddie Freeman=7HR, Fernando Tatis Jr=7HR,",
+    "VERIFIED 2026 HR TOTALS through May 3 — USE THESE EXACT NUMBERS (source: MLB.com):",
+    "Aaron Judge=13HR, Munetaka Murakami=13HR, Yordan Alvarez=12HR, Ben Rice=12HR,",
+    "Matt Olson=11HR, Mike Trout=9HR, Kyle Schwarber=9HR, Gunnar Henderson=9HR,",
+    "Pete Alonso=8HR, Bryce Harper=8HR, Juan Soto=8HR, Jordan Walker=8HR,",
+    "Bobby Witt Jr=7HR, Vladimir Guerrero Jr=7HR, Jose Ramirez=7HR, Mookie Betts=7HR,",
+    "Freddie Freeman=7HR, Fernando Tatis Jr=7HR, Shohei Ohtani=7HR, Rafael Devers=7HR,",
     "Elly De La Cruz=6HR, Julio Rodriguez=6HR, Randy Arozarena=6HR, Ian Happ=6HR,",
-    "Jarren Duran=6HR, Pete Crow-Armstrong=5HR, Alex Bregman=5HR, Willy Adames=5HR,",
-    "Byron Buxton=5HR, Nolan Arenado=5HR, Francisco Lindor=5HR, Mike Trout=4HR,",
-    "Munetaka Murakami=4HR, Nick Kurtz=4HR, Shea Langeliers=4HR, James Wood=4HR,",
-    "Jackson Chourio=4HR, Vinnie Pasquantino=4HR, Salvador Perez=4HR,",
-    "Bo Bichette=3HR, Matt Chapman=3HR, Riley Greene=3HR, Spencer Torkelson=3HR,",
-    "Jordan Walker=3HR, Ketel Marte=4HR, Corbin Carroll=3HR, William Contreras=4HR",
-    "RULE: If a player above is in today's game, use their EXACT HR count listed.",
-    "For unlisted players, estimate based on their 2026 pace and position.",
+    "Jarren Duran=6HR, Matt Chapman=6HR, Austin Riley=5HR, Shea Langeliers=5HR,",
+    "Pete Crow-Armstrong=5HR, Alex Bregman=5HR, Willy Adames=5HR, Nolan Arenado=5HR,",
+    "Francisco Lindor=5HR, Byron Buxton=5HR, Jackson Chourio=5HR, Manny Machado=5HR,",
+    "Nick Kurtz=4HR, James Wood=4HR, Vinnie Pasquantino=4HR, Salvador Perez=4HR,",
+    "Ketel Marte=4HR, Bo Bichette=4HR, Riley Greene=4HR, William Contreras=4HR,",
+    "Ozzie Albies=4HR, Jorge Soler=4HR, Spencer Torkelson=4HR, Corbin Carroll=3HR,",
+    "RULE: Use EXACT HR count listed above. For unlisted players estimate from pace/position.",
+    "CRITICAL: Do NOT invent or guess HR totals. If you don't know, use 0 rather than a wrong number.",
     "",
     "BvP vs TODAY'S PITCHER — provide career + 2026 HR stats:",
     "- hrAllowedVsTeam: career HR this pitcher has allowed to the opposing team (integer)",
@@ -849,6 +878,16 @@ export default function App() {
       const weatherMap = await fetchWeatherForGames(games);
       const weatherHits = Object.values(weatherMap).filter(w => w !== null).length;
       pushLog("✅ Weather loaded — " + weatherHits + " stadiums · " + (games.length - weatherHits) + " unavailable");
+
+      // ── Fetch LIVE 2026 HR stats from MLB API ──
+      pushLog("📊 Fetching live 2026 HR stats from MLB...");
+      const liveHRMap = await fetchLiveHRStats();
+      const liveCount = Object.keys(liveHRMap).length;
+      if (liveCount > 0) {
+        pushLog("✅ Live HR stats loaded — " + liveCount + " players from MLB Stats API");
+      } else {
+        pushLog("⚠️ Live HR fetch failed — using verified fallback counts");
+      }
 
       // Log any standout weather
       Object.entries(weatherMap).forEach(([k, w]) => {
@@ -951,18 +990,25 @@ export default function App() {
       }
 
       // Known 2026 HR totals — used to correct wrong values from Claude
+      // VERIFIED 2026 HR totals as of May 3 2026 — source: SI.com/MLB.com
       const KNOWN_2026_HR = {
-        "Aaron Judge":14,"Shohei Ohtani":11,"Kyle Schwarber":10,"Gunnar Henderson":10,
-        "Pete Alonso":9,"Yordan Alvarez":9,"Bryce Harper":8,"Juan Soto":8,
-        "Matt Olson":8,"Rafael Devers":8,"Bobby Witt Jr":7,"Vladimir Guerrero Jr":7,
-        "Jose Ramirez":7,"Mookie Betts":7,"Freddie Freeman":7,"Fernando Tatis Jr":7,
-        "Elly De La Cruz":6,"Julio Rodriguez":6,"Randy Arozarena":6,"Ian Happ":6,
-        "Jarren Duran":6,"Pete Crow-Armstrong":5,"Alex Bregman":5,"Willy Adames":5,
-        "Byron Buxton":5,"Nolan Arenado":5,"Francisco Lindor":5,"Mike Trout":4,
-        "Munetaka Murakami":4,"Nick Kurtz":4,"Shea Langeliers":4,"James Wood":4,
-        "Jackson Chourio":4,"Vinnie Pasquantino":4,"Salvador Perez":4,
-        "Bo Bichette":3,"Matt Chapman":3,"Riley Greene":3,"Spencer Torkelson":3,
-        "Jordan Walker":3,"Ketel Marte":4,"Corbin Carroll":3,"William Contreras":4,
+        // Top confirmed leaders
+        "Aaron Judge":13,"Munetaka Murakami":13,"Yordan Alvarez":12,"Ben Rice":12,
+        "Matt Olson":11,"Mike Trout":9,"Kyle Schwarber":9,"Gunnar Henderson":9,
+        "Pete Alonso":8,"Bryce Harper":8,"Juan Soto":8,"Jordan Walker":8,
+        "Bobby Witt Jr":7,"Vladimir Guerrero Jr":7,"Jose Ramirez":7,
+        "Mookie Betts":7,"Freddie Freeman":7,"Fernando Tatis Jr":7,
+        "Shohei Ohtani":7,"Rafael Devers":7,"Matt Chapman":6,
+        "Elly De La Cruz":6,"Julio Rodriguez":6,"Randy Arozarena":6,
+        "Ian Happ":6,"Jarren Duran":6,"Jackson Chourio":5,
+        "Pete Crow-Armstrong":5,"Alex Bregman":5,"Willy Adames":5,
+        "Byron Buxton":5,"Nolan Arenado":5,"Francisco Lindor":5,
+        "Shea Langeliers":5,"Nick Kurtz":4,"James Wood":4,
+        "Vinnie Pasquantino":4,"Salvador Perez":4,"Ketel Marte":4,
+        "Bo Bichette":4,"Riley Greene":4,"Spencer Torkelson":4,
+        "William Contreras":4,"Corbin Carroll":3,"Austin Riley":5,
+        "Ozzie Albies":4,"Tyler Stephenson":3,"Jonathan India":3,
+        "Jorge Soler":4,"Manny Machado":5,"Jake Cronenworth":3,
       };
 
       // Known 2026 player→team — used to catch wrong-team assignments
@@ -990,7 +1036,7 @@ export default function App() {
         // BAL
         "Gunnar Henderson":"BAL","Pete Alonso":"BAL","Cedric Mullins":"BAL","Adley Rutschman":"BAL","Anthony Santander":"BAL","Colton Cowser":"BAL",
         // NYY
-        "Aaron Judge":"NYY","Paul Goldschmidt":"NYY","Cody Bellinger":"NYY","Jazz Chisholm":"NYY","Anthony Volpe":"NYY","Gleyber Torres":"NYY","Austin Wells":"NYY",
+        "Aaron Judge":"NYY","Ben Rice":"NYY","Paul Goldschmidt":"NYY","Cody Bellinger":"NYY","Jazz Chisholm":"NYY","Anthony Volpe":"NYY","Gleyber Torres":"NYY","Austin Wells":"NYY",
         // CLE
         "Jose Ramirez":"CLE","Steven Kwan":"CLE","Josh Naylor":"CLE","Lane Thomas":"CLE","David Fry":"CLE",
         // KC
@@ -1092,9 +1138,14 @@ export default function App() {
           // 4. Attach hot streak data + boost score
           .map(p => {
             const isHot = !!hotStreakMap[p.name];
-            // Correct 2026 HR count if we have the real number
-            const knownHR = KNOWN_2026_HR[p.name];
-            const correctedHR = knownHR != null ? knownHR : (p.seasonHRs ?? null);
+            // 1. Live MLB API (most accurate)
+            // 2. Hardcoded verified fallback
+            // 3. Whatever Claude returned
+            const liveHR   = liveHRMap[p.name] ?? liveHRMap[p.name.replace(/\s+Jr\.?$/i,"").trim()];
+            const knownHR  = KNOWN_2026_HR[p.name];
+            const correctedHR = liveHR != null ? liveHR
+                              : knownHR != null ? knownHR
+                              : (p.seasonHRs ?? null);
             // Validate simHRs is reasonable (0-4000 range for most players)
             const validSims = (p.simHRs != null && p.simHRs >= 0 && p.simHRs <= 5000)
               ? p.simHRs : null;
