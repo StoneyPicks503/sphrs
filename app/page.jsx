@@ -117,6 +117,131 @@ async function callClaude(text, maxTokens = 8192) {
   return d.content.map(b => b.text || "").join("").trim();
 }
 
+
+/* ── Stadium coordinates for real weather ── */
+const STADIUM_COORDS = {
+  "Coors Field":         { lat: 39.7559, lon: -104.9942, dome: false },
+  "loanDepot Park":      { lat: 25.7781, lon: -80.2197,  dome: true  },
+  "Tropicana Field":     { lat: 27.7682, lon: -82.6534,  dome: true  },
+  "Comerica Park":       { lat: 42.3390, lon: -83.0485,  dome: false },
+  "Wrigley Field":       { lat: 41.9484, lon: -87.6553,  dome: false },
+  "Yankee Stadium":      { lat: 40.8296, lon: -73.9262,  dome: false },
+  "Kauffman Stadium":    { lat: 39.0517, lon: -94.4803,  dome: false },
+  "Busch Stadium":       { lat: 38.6226, lon: -90.1928,  dome: false },
+  "Daikin Park":         { lat: 29.7573, lon: -95.3555,  dome: true  },
+  "Angel Stadium":       { lat: 33.8003, lon: -117.8827, dome: false },
+  "T-Mobile Park":       { lat: 47.5914, lon: -122.3325, dome: true  },
+  "Oracle Park":         { lat: 37.7786, lon: -122.3893, dome: false },
+  "Petco Park":          { lat: 32.7076, lon: -117.1570, dome: false },
+  "Fenway Park":         { lat: 42.3467, lon: -71.0972,  dome: false },
+  "PNC Park":            { lat: 40.4469, lon: -80.0057,  dome: false },
+  "Great American":      { lat: 39.0979, lon: -84.5082,  dome: false },
+  "Nationals Park":      { lat: 38.8730, lon: -77.0074,  dome: false },
+  "Target Field":        { lat: 44.9817, lon: -93.2781,  dome: false },
+  "Sutter Health Park":  { lat: 38.5802, lon: -121.5005, dome: false },
+  "Truist Park":         { lat: 33.8907, lon: -84.4677,  dome: false },
+  "Globe Life Field":    { lat: 32.7512, lon: -97.0832,  dome: true  },
+  "Guaranteed Rate":     { lat: 41.8300, lon: -87.6339,  dome: false },
+};
+
+function windDegToDir(deg) {
+  const dirs = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+  return dirs[Math.round(deg / 22.5) % 16];
+}
+
+function wmoToCondition(code) {
+  if (code === 0)             return "Clear ☀️";
+  if (code <= 3)              return "Partly Cloudy ⛅";
+  if (code <= 48)             return "Foggy 🌫️";
+  if (code <= 67)             return "Rainy 🌧️";
+  if (code <= 77)             return "Snowy 🌨️";
+  if (code <= 82)             return "Showers 🌦️";
+  if (code <= 99)             return "Thunderstorms ⛈️";
+  return "Cloudy ☁️";
+}
+
+/* Fetch real weather for all games in parallel */
+async function fetchWeatherForGames(games) {
+  const weatherMap = {};
+  
+  await Promise.all(games.map(async (g) => {
+    const key = g.away + g.home;
+    const coords = STADIUM_COORDS[g.venue];
+    
+    if (!coords) {
+      weatherMap[key] = null;
+      return;
+    }
+
+    if (coords.dome) {
+      weatherMap[key] = {
+        condition: "Dome — climate controlled 🏠",
+        tempF: 72,
+        windSpeed: 0,
+        windDir: "N/A",
+        windDeg: 0,
+        isOutdoor: false,
+        hrImpact: "neutral",
+        summary: "Indoor dome — no weather impact on HR",
+      };
+      return;
+    }
+
+    try {
+      const url = "https://api.open-meteo.com/v1/forecast" +
+        "?latitude=" + coords.lat +
+        "&longitude=" + coords.lon +
+        "&current=temperature_2m,windspeed_10m,winddirection_10m,weathercode" +
+        "&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto";
+      
+      const r = await fetch(url);
+      const d = await r.json();
+      const cur = d.current;
+
+      const tempF    = Math.round(cur.temperature_2m);
+      const windSpd  = Math.round(cur.windspeed_10m);
+      const windDeg  = cur.winddirection_10m;
+      const windDir  = windDegToDir(windDeg);
+      const condition = wmoToCondition(cur.weathercode);
+
+      // HR impact assessment
+      let hrImpact = "neutral";
+      let impactNote = "";
+      if (cur.weathercode >= 51) {
+        hrImpact = "negative";
+        impactNote = "Rain may suppress HR";
+      } else if (windSpd >= 12 && (windDeg >= 315 || windDeg <= 45 || (windDeg >= 45 && windDeg <= 135))) {
+        hrImpact = "positive";
+        impactNote = windSpd + "mph wind blowing OUT — HR boost";
+      } else if (windSpd >= 12) {
+        hrImpact = "negative";
+        impactNote = windSpd + "mph wind blowing IN — HR suppressor";
+      } else if (tempF >= 80) {
+        hrImpact = "positive";
+        impactNote = "Hot " + tempF + "°F — ball carries well";
+      } else if (tempF <= 45) {
+        hrImpact = "negative";
+        impactNote = "Cold " + tempF + "°F — dead ball conditions";
+      }
+
+      weatherMap[key] = {
+        condition,
+        tempF,
+        windSpeed: windSpd,
+        windDir,
+        windDeg,
+        isOutdoor: true,
+        hrImpact,
+        summary: tempF + "°F · " + condition + " · Wind " + windSpd + "mph " + windDir + (impactNote ? " · " + impactNote : ""),
+      };
+    } catch (_) {
+      weatherMap[key] = null;
+    }
+  }));
+
+  return weatherMap;
+}
+
 /* ── JSON helpers ── */
 function sanitize(s) {
   s = s.replace(/\u201c|\u201d/g, '"').replace(/\u2018|\u2019/g, "'");
@@ -375,6 +500,11 @@ function GameCard({ game, result, isOpen, onToggle, onRemove, isRunning }) {
             {anyHot && <span style={{ fontSize: 10 }}>🔥</span>}
             {result && <span style={{ fontFamily: F.mono, fontSize: 8, color: "#00e676", background:"rgba(0,230,118,0.1)", padding:"1px 6px", borderRadius:4, border:"1px solid rgba(0,230,118,0.3)" }}>✅ analyzed</span>}
           </div>
+          {game.weather && (
+            <div style={{ fontFamily: F.mono, fontSize: 8, color: game.weather.hrImpact === "positive" ? "#00e676" : game.weather.hrImpact === "negative" ? T.red : T.muted, marginBottom: 3 }}>
+              {game.weather.isOutdoor === false ? "🏠 Indoor dome" : "🌤 " + game.weather.summary}
+            </div>
+          )}
           {/* Away team row */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
             <span style={{ fontFamily: F.mono, fontSize: 9, color: T.teal, width: 18, flexShrink: 0 }}>✈</span>
@@ -481,7 +611,7 @@ function RateLimitScreen({ error, onDismiss }) {
 }
 
 /* ── Prompt builder ── */
-function buildPrompt(games) {
+function buildPrompt(games, weatherMap = {}) {
   const eraStr = e => e === null || e === undefined ? "N/A" : String(e);
   const lines = games.map(g =>
     g.away + "@" + g.home + " | " + g.venue + " | " + g.city + " " + g.st + " | " + g.time +
@@ -502,8 +632,17 @@ function buildPrompt(games) {
     "Fernando Tatis Jr=SD, Munetaka Murakami=CWS, Vladimir Guerrero Jr=TOR,",
     "Francisco Lindor=NYM, Ian Happ=CHC, Pete Crow-Armstrong=CHC, Matt Chapman=SF",
     "",
-    "TODAY'S GAMES:",
+    "TODAY'S GAMES (with REAL live weather data fetched from weather API):",
     lines,
+    "",
+    "REAL WEATHER CONDITIONS RIGHT NOW (use these exact values for weatherInsight):",
+    ...games.map(g => {
+      const key = g.away + g.home;
+      const w = weatherMap[key];
+      if (!w) return g.away + "@" + g.home + ": Weather unavailable — estimate based on city/season";
+      return g.away + "@" + g.home + " at " + g.venue + ": " + w.summary +
+        (w.hrImpact === "positive" ? " ✅ HR FAVORABLE" : w.hrImpact === "negative" ? " ❌ HR UNFAVORABLE" : " ➡️ NEUTRAL");
+    }),
     "",
     "TASK: For EACH game return the top 3 HR candidates only from the TWO TEAMS in THAT specific game.",
     "CRITICAL: ONLY include POSITION PLAYERS (batters). NEVER include pitchers as HR candidates.",
@@ -591,10 +730,22 @@ export default function App() {
 
     try {
       pushLog("⚾ Loading " + games.length + " game(s)...");
-      await new Promise(r => setTimeout(r, 200));
-      pushLog("📊 Analyzing BvP + HR chance % per player...");
       await new Promise(r => setTimeout(r, 150));
-      pushLog("🌤 Estimating weather + park factors...");
+
+      // ── Fetch real weather for all stadiums in parallel ──
+      pushLog("🌤 Fetching live weather for all " + games.length + " stadiums...");
+      const weatherMap = await fetchWeatherForGames(games);
+      const weatherHits = Object.values(weatherMap).filter(w => w !== null).length;
+      pushLog("✅ Weather loaded — " + weatherHits + " stadiums · " + (games.length - weatherHits) + " unavailable");
+
+      // Log any standout weather
+      Object.entries(weatherMap).forEach(([k, w]) => {
+        if (w && w.hrImpact === "positive") pushLog("🌬️ HR weather boost: " + k + " — " + w.summary);
+        if (w && w.hrImpact === "negative") pushLog("🧊 HR weather suppress: " + k + " — " + w.summary);
+      });
+
+      await new Promise(r => setTimeout(r, 150));
+      pushLog("📊 Analyzing BvP + HR chance % per player...");
       await new Promise(r => setTimeout(r, 150));
       pushLog("🎲 Running 10,000-game Monte Carlo...");
       await new Promise(r => setTimeout(r, 150));
@@ -607,9 +758,15 @@ export default function App() {
         batches.push(games.slice(i, i + BATCH));
       }
 
+      // Attach weather to game objects so game cards can display it
+      setGames(prev => prev.map(g => ({
+        ...g,
+        weather: weatherMap[g.away + g.home] || null,
+      })));
+
       for (let b = 0; b < batches.length; b++) {
         pushLog("🤖 Analyzing batch " + (b + 1) + " of " + batches.length + " (" + batches[b].length + " games)...");
-        const raw    = await callClaude(buildPrompt(batches[b]), 8192);
+        const raw    = await callClaude(buildPrompt(batches[b], weatherMap), 8192);
         const parsed = grabJSON(raw);
         const batchResults = parsed.games ?? [];
         allGameResults.push(...batchResults);
