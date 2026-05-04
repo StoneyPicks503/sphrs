@@ -1,27 +1,30 @@
 import { NextResponse } from "next/server";
 
-const PASSWORD = process.env.SITE_PASSWORD || "sphrs2026";
-
 export function middleware(request) {
   const { pathname } = request.nextUrl;
 
-  // Skip password check for the login page and its API
-  if (pathname === "/login" || pathname.startsWith("/api/")) {
+  // Allow login page and all API routes through
+  if (
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/api/") ||
+    pathname.startsWith("/_next/") ||
+    pathname.includes(".")
+  ) {
     return NextResponse.next();
   }
 
-  // Check if user has valid auth cookie
+  // Check cookie
   const auth = request.cookies.get("sphrs-auth");
-  if (auth?.value === PASSWORD) {
+  const password = process.env.SITE_PASSWORD || "sphrs2026";
+
+  if (auth?.value === password) {
     return NextResponse.next();
   }
 
-  // Redirect to login
-  const loginUrl = new URL("/login", request.url);
-  loginUrl.searchParams.set("from", pathname);
-  return NextResponse.redirect(loginUrl);
+  // Not authenticated — redirect to login
+  return NextResponse.redirect(new URL("/login", request.url));
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)"],
 };
