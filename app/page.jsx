@@ -505,8 +505,9 @@ function buildPrompt(games) {
     "TODAY'S GAMES:",
     lines,
     "",
-    "TASK: For EACH game return the top 3 HR candidates only (best HR spots from either team).",
+    "TASK: For EACH game return the top 3 HR candidates only from the TWO TEAMS in THAT specific game.",
     "CRITICAL: ONLY include POSITION PLAYERS (batters). NEVER include pitchers as HR candidates.",
+    "CRITICAL: Every player MUST play for either the away team OR the home team of their specific game. No cross-game players.",
     "Do NOT list any starting pitcher, relief pitcher, or anyone listed as SP/RP/LHP/RHP as a batter.",
     "Players must be: outfielders, infielders, catchers, or designated hitters ONLY.",
     "Include each player's MLB MLBAM ID for headshots.",
@@ -689,28 +690,60 @@ export default function App() {
         if (c.hotStreak) hotStreakMap[c.name] = c.hotNote || "Hot streak";
       });
 
-      // Map results — remove flagged, deduplicate across ALL games, boost hot streaks
+      // Build a lookup: gameKey → { away, home } so we can validate team membership
+      const gameTeamMap = {};
+      allGameResults.forEach(gr => {
+        gameTeamMap[gr.away + gr.home] = { away: gr.away, home: gr.home };
+      });
+      // Also map from ALL_GAMES in case Claude omits away/home from game result
+      games.forEach(g => {
+        const k = g.away + g.home;
+        if (!gameTeamMap[k]) gameTeamMap[k] = { away: g.away, home: g.home };
+      });
+
+      // Map results — strict team validation + dedup + hot streak boost
       const seenPlayers = new Set();
       const newResults = {};
+
       allGameResults.forEach(gr => {
+        // Resolve the correct away/home teams for this game
         const key = gr.away + gr.home;
+        const teams = gameTeamMap[key] || { away: gr.away, home: gr.home };
+        const validTeams = new Set([teams.away, teams.home]);
+
         const cleanPlayers = (gr.players ?? [])
-          .filter(p => !flaggedNames.has(p.name))        // remove pitchers / wrong team
-          .filter(p => {                                   // global dedup — no player twice
-            if (seenPlayers.has(p.name.toLowerCase())) return false;
-            seenPlayers.add(p.name.toLowerCase());
+          // 1. HARD: player's team must be one of the two teams in this exact game
+          .filter(p => {
+            if (!p.team) return false;
+            if (validTeams.has(p.team)) return true;
+            pushLog("⚠️ " + p.name + " (" + p.team + ") not in " + teams.away + "@" + teams.home + " — removed");
+            return false;
+          })
+          // 2. Remove flagged (pitchers / wrong roster)
+          .filter(p => !flaggedNames.has(p.name))
+          // 3. Global dedup — same player can't appear in two different games
+          .filter(p => {
+            const key2 = p.name.toLowerCase().trim();
+            if (seenPlayers.has(key2)) return false;
+            seenPlayers.add(key2);
             return true;
           })
-          .map(p => ({
-            ...p,
-            hotStreak: !!hotStreakMap[p.name],
-            hotNote: hotStreakMap[p.name] || "",
-            // Boost hrChancePct by up to 3% for hot streak players
-            hrChancePct: p.hotStreak || hotStreakMap[p.name]
-              ? Math.min(35, (p.hrChancePct ?? 0) + 2.5)
-              : (p.hrChancePct ?? 0),
-          }))
+          // 4. Attach hot streak data + boost score
+          .map(p => {
+            const isHot = !!hotStreakMap[p.name];
+            return {
+              ...p,
+              // Lock team to match isHome flag vs game teams
+              team: p.isHome ? teams.home : teams.away,
+              hotStreak: isHot,
+              hotNote: hotStreakMap[p.name] || "",
+              hrChancePct: isHot
+                ? Math.min(35, (p.hrChancePct ?? 0) + 2.5)
+                : (p.hrChancePct ?? 0),
+            };
+          })
           .sort((a, b) => (b.hrChancePct ?? 0) - (a.hrChancePct ?? 0));
+
         newResults[key] = { players: cleanPlayers };
       });
 
