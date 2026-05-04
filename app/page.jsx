@@ -302,11 +302,16 @@ async function fetchWeatherForGames(games) {
 
 /* ── JSON helpers ── */
 function sanitize(s) {
-  s = s.replace(/\u201c|\u201d/g, '"').replace(/\u2018|\u2019/g, "'");
+  s = s.replace(/[\u201c\u201d]/g, '"').replace(/[\u2018\u2019]/g, "'");
   s = s.replace(/'([A-Za-z_][A-Za-z0-9_]{0,50})['"]\s*:/g, '"$1":');
   s = s.replace(/"([A-Za-z_][A-Za-z0-9_]{0,50})'\s*:/g, '"$1":');
-  s = s.replace(/,(\s*[}\]])/g, "$1");
-  s = s.replace(/:\s*True\b/g, ": true").replace(/:\s*False\b/g, ": false").replace(/:\s*None\b/g, ": null");
+  // Fix Claude using parentheses () instead of brackets [] for arrays
+  s = s.replace(/:\s*\(\s*\{/g, ': [{');
+  s = s.replace(/\}\s*\)/g, '}]');
+  s = s.replace(/(:"players"|:"games"|:"zones")\s*\(/g, '$1[');
+  s = s.replace(/,(\s*[}\]])/g, '$1');
+  s = s.replace(/:\s*True\b/g, ': true').replace(/:\s*False\b/g, ': false').replace(/:\s*None\b/g, ': null').replace(/:\s*undefined\b/g, ': null');
+  s = s.replace(/:\s*\.(\d+)/g, ': 0.$1');
   return s;
 }
 function grabJSON(raw) {
@@ -316,11 +321,32 @@ function grabJSON(raw) {
   if (st === -1) throw new Error("No JSON found");
   const end = s[st] === "{" ? s.lastIndexOf("}") : s.lastIndexOf("]");
   const slice = s.slice(st, end + 1);
+  // Attempt 1: raw parse
   try { const p = JSON.parse(slice); if (p && typeof p === "object") return p; } catch (_) {}
+  // Attempt 2: sanitized parse
   const clean = sanitize(slice);
   try { const p = JSON.parse(clean); if (p && typeof p === "object") return p; } catch (_) {}
-  const m = clean.match(/"games"\s*:\s*(\[[\s\S]*\])/);
-  if (m) { try { return { games: JSON.parse(m[1]) }; } catch (_) {} }
+  // Attempt 3: fix truncated JSON by closing open brackets/braces
+  try {
+    let fixed = clean;
+    const opens = (fixed.match(/\[/g)||[]).length - (fixed.match(/\]/g)||[]).length;
+    const openb = (fixed.match(/\{/g)||[]).length - (fixed.match(/\}/g)||[]).length;
+    for (let i = 0; i < opens; i++) fixed += "]";
+    for (let i = 0; i < openb; i++) fixed += "}";
+    fixed = sanitize(fixed);
+    const p = JSON.parse(fixed);
+    if (p && typeof p === "object") return p;
+  } catch (_) {}
+  // Attempt 4: regex extract games array
+  const m = clean.match(/"games"\s*:\s*(\[[\s\S]*)/);
+  if (m) {
+    try {
+      let arr = m[1];
+      const op = (arr.match(/\[/g)||[]).length - (arr.match(/\]/g)||[]).length;
+      for (let i = 0; i < op; i++) arr += "]";
+      return { games: JSON.parse(sanitize(arr)) };
+    } catch (_) {}
+  }
   throw new Error("JSON parse failed: " + slice.slice(0, 150));
 }
 
@@ -704,7 +730,7 @@ function buildPrompt(games, weatherMap = {}) {
         (w.hrImpact === "positive" ? " ✅ HR FAVORABLE" : w.hrImpact === "negative" ? " ❌ HR UNFAVORABLE" : " ➡️ NEUTRAL");
     }),
     "",
-    "TASK: For EACH game return exactly 5 HR candidates from the TWO TEAMS in THAT specific game (mix from both teams, best HR spots first).",
+    "TASK: For EACH game return exactly 4 HR candidates from the TWO TEAMS in THAT specific game (best HR spots first — mix both teams).",
     "CRITICAL: ONLY include POSITION PLAYERS (batters). NEVER include pitchers as HR candidates.",
     "CRITICAL: Every player MUST play for either the away team OR the home team of their specific game. No cross-game players.",
     "Do NOT list any starting pitcher, relief pitcher, or anyone listed as SP/RP/LHP/RHP as a batter.",
