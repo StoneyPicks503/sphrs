@@ -756,8 +756,7 @@ function PlayerRow({ p, rank, delay = 0 }) {
             <span style={{ fontFamily: F.arch, fontSize: 13, color: T.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {p.name}
             </span>
-            {p.hotStreak >= 3 && <span style={{ fontSize: 12, flexShrink: 0 }} title={p.hotStreakNote}>🔥🔥</span>}
-            {p.hotStreak > 0 && p.hotStreak < 3 && <span style={{ fontSize: 11, flexShrink: 0 }} title={p.hotStreakNote}>🔥</span>}
+
           </div>
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}>
             <span style={{ fontFamily: F.mono, fontSize: 9, color: T.muted }}>{p.team}</span>
@@ -848,28 +847,13 @@ function PlayerRow({ p, rank, delay = 0 }) {
               {p.isHome ? "🏠" : "✈"} {p.homeAwaySplit}
             </div>
           )}
-          {p.hotStreak && p.hotNote && (
-            <div style={{ fontFamily: F.mono, fontSize: 9, color: "#ff6b00", background: "rgba(255,107,0,0.1)", border: "1px solid rgba(255,107,0,0.35)", borderRadius: 6, padding: "5px 8px", marginBottom: 5, lineHeight: 1.5 }}>
-              🔥 HOT STREAK: {p.hotNote}
-            </div>
-          )}
+
           {p.weatherInsight && (
             <div style={{ fontFamily: F.mono, fontSize: 9, color: T.green + "cc", background: "rgba(0,230,118,0.07)", border: "1px solid rgba(0,230,118,0.25)", borderRadius: 6, padding: "5px 8px", lineHeight: 1.5 }}>
               🌤 {p.weatherInsight}
             </div>
           )}
           {/* Hot streak banner */}
-          {p.hotStreak > 0 && (
-            <div style={{ fontFamily: F.mono, fontSize: 9, lineHeight: 1.5, marginTop: 4,
-              background: p.hotStreak >= 3 ? "rgba(255,100,0,0.12)" : "rgba(255,200,0,0.08)",
-              border: "1px solid " + (p.hotStreak >= 3 ? "rgba(255,100,0,0.4)" : "rgba(255,200,0,0.3)"),
-              borderRadius: 6, padding: "5px 8px",
-              color: p.hotStreak >= 3 ? "#ff6600" : T.amber + "cc",
-            }}>
-              {p.hotStreak >= 3 ? "🔥🔥" : "🔥"} HOT STREAK — {p.hotStreak} HR in last 10 games
-              {p.hotStreakNote && <span style={{ color: T.muted, marginLeft: 4 }}>· {p.hotStreakNote}</span>}
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -908,7 +892,7 @@ function GameCard({ game, result, isOpen, onToggle, onRemove, isRunning }) {
           {/* Venue + time + badges */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 5 }}>
             <span style={{ fontFamily: F.mono, fontSize: 9, color: T.muted }}>{game.venue} · {game.time}</span>
-            {anyHot && <span style={{ fontSize: 10 }}>🔥</span>}
+            
             {result && <span style={{ fontFamily: F.mono, fontSize: 8, color: "#00e676", background:"rgba(0,230,118,0.1)", padding:"1px 6px", borderRadius:4, border:"1px solid rgba(0,230,118,0.3)" }}>✅ analyzed</span>}
           </div>
           {game.weather && (
@@ -923,7 +907,7 @@ function GameCard({ game, result, isOpen, onToggle, onRemove, isRunning }) {
             <span style={{ fontFamily: F.mono, fontSize: 9, color: awayHot ? "#00e676" : T.muted }}>
               {game.awayP} · {game.awayH} · ERA {eraDisplay(game.awayERA)}
               {game.awayWhip ? " · WHIP " + game.awayWhip : ""}
-              {awayHot ? " 🔥" : ""}
+              
             </span>
           </div>
           {/* Divider */}
@@ -935,7 +919,7 @@ function GameCard({ game, result, isOpen, onToggle, onRemove, isRunning }) {
             <span style={{ fontFamily: F.mono, fontSize: 9, color: homeHot ? "#00e676" : T.muted }}>
               {game.homeP} · {game.homeH} · ERA {eraDisplay(game.homeERA)}
               {game.homeWhip ? " · WHIP " + game.homeWhip : ""}
-              {homeHot ? " 🔥" : ""}
+              
             </span>
           </div>
         </div>
@@ -1038,42 +1022,32 @@ function buildPrompt(games, weatherMap = {}, gameData = {}) {
     "Alex Bregman=BOS, Randy Arozarena=SEA, Paul Goldschmidt=NYY, Cody Bellinger=NYY,",
     "Munetaka Murakami=CWS, Fernando Tatis Jr=SD, Ben Rice=NYY.",
     "",
-    "REAL STATS (from MLB API — reference these for your analysis):",
+    "REAL BATTER STATS (MLB API):",
     ...games.map(g => {
       const key = g.away + g.home;
       const w   = weatherMap[key];
       const gd  = gameData[key];
-      const wStr = w ? w.tempF + "F " + w.windSpeed + "mph " + w.windDir + "(" + (w.windVsField||"?") + ")" + (w.hrImpact==="positive"?" HR+":w.hrImpact==="negative"?" HR-":"") : "no data";
-      const fmtH = (hitters, bvpMap, oppP) => (hitters||[]).slice(0,5).map(h =>
-        h.name + " " + h.hr + "HR " + h.avg + (bvpMap[h.name] ? " BvP:" + bvpMap[h.name].hr + "HR/" + bvpMap[h.name].ab + "AB" : "")
+      const wStr = w ? w.tempF+"F "+w.windSpeed+"mph "+w.windDir+"("+( w.windVsField||"?")+")"+(w.hrImpact==="positive"?" HR+":w.hrImpact==="negative"?" HR-":"") : "";
+      const fmtH = (hitters, bvpMap) => (hitters||[]).slice(0,5).map(h =>
+        h.name+" "+h.hr+"HR "+h.avg+(bvpMap[h.name]?" bvp:"+bvpMap[h.name].hr+"HR/"+bvpMap[h.name].ab+"AB":"")
       ).join(", ");
-      const awayStr = gd ? fmtH(gd.awayHitters, gd.awayBvP||{}, g.homeP) : "";
-      const homeStr = gd ? fmtH(gd.homeHitters, gd.homeBvP||{}, g.awayP) : "";
-      return g.away+"@"+g.home+" | "+g.awayP+" ERA "+(g.awayERA||"?")+
-        " vs "+g.homeP+" ERA "+(g.homeERA||"?")+" | Weather:"+wStr+
-        (awayStr?" | "+g.away+":"+awayStr:"")+
-        (homeStr?" | "+g.home+":"+homeStr:"");
+      return g.away+"@"+g.home+": "+g.awayP+" ERA "+(g.awayERA||"?")+" vs "+g.homeP+" ERA "+(g.homeERA||"?")
+        +(wStr?" weather:"+wStr:"")
+        +(gd?" | "+g.away+": "+fmtH(gd.awayHitters,gd.awayBvP||{})+" | "+g.home+": "+fmtH(gd.homeHitters,gd.homeBvP||{}):"");
     }),
     "",
-    "TODAY'S GAMES:",
-    ...games.map(g => g.away+"@"+g.home+" "+g.venue+" "+g.time+" | Away SP:"+g.awayP+" "+g.awayH+" ERA "+(g.awayERA||"N/A")+" | Home SP:"+g.homeP+" "+g.homeH+" ERA "+(g.homeERA||"N/A")),
+    "GAMES:",
+    ...games.map(g => g.away+"@"+g.home+" "+g.venue+" "+g.time),
     "",
-    "TASK: Pick top 3 HR candidates per game. ONLY position players — NO pitchers.",
-    "Do NOT include anyone on the IL or injured.",
-    "Each player must actually play for one of the two teams in their game.",
+    "TASK: For each game pick the TOP 3 HR candidates (position players only, no pitchers, no IL players).",
+    "Reply in EXACTLY this format, one game per line, nothing else:",
     "",
-    "Return ONLY this JSON — no extra fields, no weatherSummary, nothing else:",
-    '{"games":[{"away":"BAL","home":"NYY","players":[',
-    '{"name":"Aaron Judge","team":"NYY","isHome":true,"hrChancePct":18,"confidence":85},',
-    '{"name":"Pete Alonso","team":"BAL","isHome":false,"hrChancePct":12,"confidence":70}',
-    ']}]}',
+    "BOS@DET: Riley Greene 82, Spencer Torkelson 71, Kerry Carpenter 65",
+    "NYY@TEX: Aaron Judge 90, Jazz Chisholm 72, Anthony Volpe 61",
     "",
-    "RULES:",
-    "1. Double-quotes only. Start with { end with }.",
-    "2. Return EXACTLY 3 players per game.",
-    "3. Fields per player: name (string), team (string), isHome (bool), hrChancePct (number 0-35), confidence (number 0-100).",
-    "4. ONLY those 5 fields. NO bvpNote, NO weatherNote, NO other fields.",
-    "5. No text outside the JSON object.",
+    "Format: AWAY@HOME: PlayerName SCORE, PlayerName SCORE, PlayerName SCORE",
+    "SCORE = your confidence 0-100. ONLY position players. ONLY players on those two teams.",
+    "No extra text. No explanations. Just the lines.",
   ].join("\n");
 }
 
@@ -1223,15 +1197,47 @@ export default function App() {
         // Store batch game data for post-processing
         Object.assign(allGameData, batchGameData);
 
-        const raw    = await callClaude(buildPrompt(batches[b], weatherMap, batchGameData), 8192);
-        const parsed = grabJSON(raw);
-        const batchResults = parsed.games ?? [];
+        const raw = await callClaude(buildPrompt(batches[b], weatherMap, batchGameData), 2000);
+        // Parse plain text format: "BOS@DET: Riley Greene 82, Spencer Torkelson 71, Kerry Carpenter 65"
+        const batchResults = [];
+        const lines = raw.split("\n").map(l => l.trim()).filter(l => l.includes("@") && l.includes(":"));
+        lines.forEach(line => {
+          const colonIdx = line.indexOf(":");
+          const gamePart = line.slice(0, colonIdx).trim(); // "BOS@DET"
+          const playersPart = line.slice(colonIdx + 1).trim();
+          const [away, home] = gamePart.split("@");
+          if (!away || !home) return;
+          // Match game to our batch
+          const game = batches[b].find(g =>
+            g.away.toUpperCase() === away.toUpperCase() &&
+            g.home.toUpperCase() === home.toUpperCase()
+          );
+          if (!game) return;
+          // Parse players: "Riley Greene 82, Spencer Torkelson 71"
+          const playerEntries = playersPart.split(",").map(p => p.trim()).filter(Boolean);
+          const players = playerEntries.slice(0, 3).map(entry => {
+            const parts = entry.trim().split(" ");
+            const score = parseInt(parts[parts.length - 1]);
+            const name  = isNaN(score) ? entry.trim() : parts.slice(0, -1).join(" ");
+            const conf  = isNaN(score) ? 70 : score;
+            return {
+              name:        name.trim(),
+              team:        "",  // will be set by validation
+              isHome:      null,
+              hrChancePct: Math.round(conf / 4), // convert 0-100 → 0-25 range
+              confidence:  conf,
+            };
+          }).filter(p => p.name.length > 2);
+          if (players.length > 0) {
+            batchResults.push({ away: away.toUpperCase(), home: home.toUpperCase(), players });
+          }
+        });
         allGameResults.push(...batchResults);
         setStep("✅ Batch " + (b + 1) + " done — " + batchResults.length + " games analyzed");
       }
 
       // ── VERIFICATION PASS ─────────────────────────────────────────────────
-      setStep("🔍 Verifying positions, rosters & hot streaks...");
+      setStep("🔍 Verifying positions & rosters...");
 
       // Collect ALL players across all games
       const allPlayers = [];
@@ -1263,14 +1269,13 @@ export default function App() {
         "   Cody Bellinger=NYY, Rafael Devers=SF, Willy Adames=SF, Alex Bregman=BOS,",
         "   Randy Arozarena=SEA, Shohei Ohtani=LAD, Munetaka Murakami=CWS.",
         "3. ACTIVE ROSTER — flag if on IL or in minors.",
-        "4. HOT STREAK — note if player has hit HR in 2+ of last 5 games (true/false + brief note).",
         "",
         "Players:",
         vList,
         "",
         "Return ONLY a JSON array. Start with [ end with ]. No other text.",
-        '[{"i":0,"name":"Aaron Judge","ok":true,"reason":"","hotStreak":true,"hotNote":"HR in 3 of last 5 games"},',
-        '{"i":1,"name":"Max Fried","ok":false,"reason":"Pitcher — not a batter","hotStreak":false,"hotNote":""}]',
+        '[{"i":0,"name":"Aaron Judge","ok":true,"reason":""},',
+        '{"i":1,"name":"Max Fried","ok":false,"reason":"Pitcher — not a batter"}]',
       ].join("\n");
 
       let verifyChecks = [];
@@ -1280,20 +1285,16 @@ export default function App() {
         verifyChecks = Array.isArray(vParsed) ? vParsed : [];
 
         const flagged = verifyChecks.filter(c => c.ok === false);
-        const hotPlayers = verifyChecks.filter(c => c.hotStreak === true);
 
         if (flagged.length > 0) {
           flagged.forEach(f => setStep("⚠️ Removed " + f.name + " — " + (f.reason || "failed check")));
-        }
-        if (hotPlayers.length > 0) {
-          setStep("🔥 Hot streaks: " + hotPlayers.map(h => h.name).join(", "));
         }
         if (flagged.length === 0) {
           setStep("✅ All players verified — position players on correct 2026 rosters");
         }
       } catch (_) {
         setStep("⚠️ Verification inconclusive — using original picks");
-        verifyChecks = uniqueForVerify.map((_, i) => ({ i, ok: true, hotStreak: false, hotNote: "" }));
+        verifyChecks = uniqueForVerify.map((_, i) => ({ i, ok: true }));
       }
 
       // Known 2026 HR totals — used to correct wrong values from Claude
@@ -1400,10 +1401,6 @@ export default function App() {
       const flaggedNames = new Set(
         verifyChecks.filter(c => c.ok === false).map(c => c.name)
       );
-      const hotStreakMap = {};
-      verifyChecks.forEach(c => {
-        if (c.hotStreak) hotStreakMap[c.name] = c.hotNote || "Hot streak";
-      });
 
       // Build a lookup: gameKey → { away, home } so we can validate team membership
       const gameTeamMap = {};
@@ -1467,7 +1464,6 @@ export default function App() {
           })
           // 7. Fill in ALL stats from real fetched data — Claude only picked the player
           .map(p => {
-            const isHot    = !!hotStreakMap[p.name];
             const gameKey2 = gr.away + gr.home;
             const gd2      = allGameData[gameKey2];
             const nameKey  = n => n.replace(/\s+(Jr|Sr)\.?$/i,"").trim().toLowerCase();
@@ -1510,9 +1506,7 @@ export default function App() {
               bvpAVG:       bvp?.avg ?? null,
               weatherInsight,
               simHRs:       Math.min(Math.round(simCount), 1000),
-              hotStreak:    isHot,
-              hotNote:      hotStreakMap[p.name] || "",
-              hrChancePct:  isHot ? Math.min(35, (p.hrChancePct??0)+2.5) : (p.hrChancePct??0),
+              hrChancePct:  p.hrChancePct ?? 0,
             };
           })
           .sort((a, b) => (b.hrChancePct ?? 0) - (a.hrChancePct ?? 0))
