@@ -300,32 +300,87 @@ async function fetchWeatherForGames(games) {
   return weatherMap;
 }
 
-/* ── Live 2026 HR stats from MLB Stats API ── */
-async function fetchLiveHRStats(playerNames) {
+/* ── MLB Stats API — Live HR + BvP ── */
+
+/* Fetch 2026 season HR totals for every batter (top 300) */
+async function fetchLiveHRStats() {
   const hrMap = {};
   try {
-    // MLB Stats API — free, no key needed
-    // Fetch season batting stats sorted by HR for 2026
-    const url = "https://statsapi.mlb.com/api/v1/stats?stats=season&group=hitting&season=2026&sortStat=homeRuns&limit=200&fields=stats,splits,stat,homeRuns,player,fullName";
+    const url = "https://statsapi.mlb.com/api/v1/stats" +
+      "?stats=season&group=hitting&season=2026&sortStat=homeRuns&limit=300" +
+      "&fields=stats,splits,stat,homeRuns,gamesPlayed,avg,ops,player,fullName,id";
     const r = await fetch(url);
-    if (!r.ok) throw new Error("MLB API " + r.status);
+    if (!r.ok) throw new Error("HR API " + r.status);
     const d = await r.json();
-    const splits = d.stats?.[0]?.splits ?? [];
-    splits.forEach(s => {
+    (d.stats?.[0]?.splits ?? []).forEach(s => {
       const name = s.player?.fullName;
-      const hr   = s.stat?.homeRuns;
-      if (name && hr != null) {
-        hrMap[name] = hr;
-        // Also store without Jr./Sr. suffix variants
-        const short = name.replace(/\s+Jr\.?$|\s+Sr\.?$/i, "").trim();
-        if (short !== name) hrMap[short] = hr;
-      }
+      const id   = s.player?.id;
+      if (!name) return;
+      const stats = {
+        hr:  s.stat?.homeRuns  ?? 0,
+        gp:  s.stat?.gamesPlayed ?? 0,
+        avg: s.stat?.avg ?? ".000",
+        ops: s.stat?.ops ?? ".000",
+        id,
+      };
+      hrMap[name] = stats;
+      // Store without Jr/Sr suffix for fuzzy matching
+      const short = name.replace(/\s+(Jr|Sr)\.?$/i, "").trim();
+      if (short !== name) hrMap[short] = stats;
     });
-    console.log("✅ Live HR stats loaded:", Object.keys(hrMap).length, "players");
+    console.log("HR stats loaded:", Object.keys(hrMap).length, "players");
   } catch (e) {
-    console.warn("⚠️ Live HR fetch failed:", e.message, "— using hardcoded fallback");
+    console.warn("HR fetch failed:", e.message);
   }
   return hrMap;
+}
+
+/* Fetch BvP career stats for a batter vs pitcher pair using MLBAM IDs */
+async function fetchBvP(batterId, pitcherId) {
+  if (!batterId || !pitcherId) return null;
+  try {
+    const url = "https://statsapi.mlb.com/api/v1/stats" +
+      "?stats=vsPlayer&group=hitting&playerId=" + batterId +
+      "&opposingPlayerId=" + pitcherId +
+      "&fields=stats,splits,stat,homeRuns,atBats,avg,ops,strikeOuts,player,fullName";
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const d = await r.json();
+    const split = d.stats?.[0]?.splits?.[0];
+    if (!split) return null;
+    return {
+      hr:  split.stat?.homeRuns   ?? 0,
+      ab:  split.stat?.atBats     ?? 0,
+      avg: split.stat?.avg        ?? ".000",
+      ops: split.stat?.ops        ?? ".000",
+      so:  split.stat?.strikeOuts ?? 0,
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+/* Lookup pitcher MLBAM ID by name */
+async function fetchPitcherIds(pitcherNames) {
+  const idMap = {};
+  try {
+    // Use MLB player search API
+    await Promise.all(pitcherNames.map(async name => {
+      try {
+        const encoded = encodeURIComponent(name);
+        const url = "https://statsapi.mlb.com/api/v1/people/search?names=" + encoded +
+          "&fields=people,fullName,id,primaryPosition,primaryPosition.abbreviation";
+        const r = await fetch(url);
+        const d = await r.json();
+        const match = (d.people ?? []).find(p =>
+          p.fullName?.toLowerCase() === name.toLowerCase() &&
+          ["P","SP","RP"].includes(p.primaryPosition?.abbreviation)
+        );
+        if (match) idMap[name] = match.id;
+      } catch (_) {}
+    }));
+  } catch (_) {}
+  return idMap;
 }
 
 /* ── Live MLB Injury Report ── */
@@ -540,12 +595,22 @@ function PlayerRow({ p, rank, delay = 0 }) {
       {expanded && (
         <div style={{ padding: "0 12px 12px 12px", borderTop: "1px solid " + T.border }}>
           <div style={{ marginTop: 10, display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
-            {/* 2026 HR count — prominent banner */}
-            <div style={{ width: "100%", background: "rgba(0,229,255,0.08)", border: "1px solid rgba(0,229,255,0.3)", borderRadius: 7, padding: "5px 10px", marginBottom: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontFamily: F.mono, fontSize: 9, color: T.muted }}>2026 SEASON</span>
-              <span style={{ fontFamily: F.arch, fontSize: 13, color: T.accent }}>
+            {/* 2026 season HR — live from MLB API */}
+            <div style={{ width:"100%", background:"rgba(0,229,255,0.08)", border:"1px solid rgba(0,229,255,0.3)", borderRadius:7, padding:"5px 10px", marginBottom:4, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <span style={{ fontFamily:F.mono, fontSize:9, color:T.muted }}>2026 SEASON <span style={{ color:"#00e676", fontSize:7 }}>● LIVE</span></span>
+              <span style={{ fontFamily:F.arch, fontSize:13, color:T.accent }}>
                 {p.seasonHRs ?? "—"} HR
-                <span style={{ fontFamily: F.mono, fontSize: 9, color: T.muted, marginLeft: 6 }}>in {p.gamesPlayed ?? "—"} games</span>
+                <span style={{ fontFamily:F.mono, fontSize:9, color:T.muted, marginLeft:6 }}>in {p.gamesPlayed ?? "—"}g · {p.avg ?? p.ops ?? ""}</span>
+              </span>
+            </div>
+            {/* BvP vs today's pitcher — live from MLB API */}
+            <div style={{ width:"100%", background:"rgba(255,202,40,0.07)", border:"1px solid rgba(255,202,40,0.3)", borderRadius:7, padding:"5px 10px", marginBottom:4, display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:4 }}>
+              <span style={{ fontFamily:F.mono, fontSize:9, color:T.amber }}>vs {p.pitcher} <span style={{ color:"#00e676", fontSize:7 }}>● LIVE BvP</span></span>
+              <span style={{ fontFamily:F.mono, fontSize:10, color:T.text }}>
+                {p.bvpAB != null
+                  ? <>{p.bvpAB} AB · <span style={{ color:T.amber }}>{p.bvpAVG} AVG</span> · <span style={{ color:"#00e676" }}>{p.bvpHR} HR</span></>
+                  : (p.bvpSummary || "No career data")
+                }
               </span>
             </div>
             {/* Sim result banner */}
@@ -915,14 +980,21 @@ export default function App() {
       pushLog("✅ Weather loaded — " + weatherHits + " stadiums · " + (games.length - weatherHits) + " unavailable");
 
       // ── Fetch LIVE 2026 HR stats from MLB API ──
-      pushLog("📊 Fetching live 2026 HR stats from MLB...");
+      pushLog("📊 Fetching live 2026 HR stats from MLB Stats API...");
       const liveHRMap = await fetchLiveHRStats();
       const liveCount = Object.keys(liveHRMap).length;
-      if (liveCount > 0) {
-        pushLog("✅ Live HR stats loaded — " + liveCount + " players from MLB Stats API");
-      } else {
-        pushLog("⚠️ Live HR fetch failed — using verified fallback counts");
-      }
+      pushLog(liveCount > 0
+        ? "✅ Live HR data — " + liveCount + " players loaded"
+        : "⚠️ HR fetch failed — using verified fallback");
+
+      // ── Fetch pitcher MLBAM IDs for BvP lookups ──
+      const allPitcherNames = [...new Set(games.map(g => [g.awayP, g.homeP]).flat().filter(p => p && p !== "TBD"))];
+      pushLog("⚔️ Fetching pitcher IDs for BvP lookups (" + allPitcherNames.length + " pitchers)...");
+      const pitcherIdMap = await fetchPitcherIds(allPitcherNames);
+      pushLog("✅ " + Object.keys(pitcherIdMap).length + " pitcher IDs resolved");
+
+      // BvP cache — populated after we know which batters face which pitchers
+      const bvpCache = {};
 
       // ── Fetch live injury report ──
       pushLog("🏥 Checking MLB injury report...");
@@ -1209,27 +1281,46 @@ export default function App() {
             seenPlayers.add(key2);
             return true;
           })
-          // 4. Attach hot streak data + boost score
+          // 4. Attach live stats, BvP cache lookup, hot streak
           .map(p => {
             const isHot = !!hotStreakMap[p.name];
-            // 1. Live MLB API (most accurate)
-            // 2. Hardcoded verified fallback
-            // 3. Whatever Claude returned
-            const liveHR   = liveHRMap[p.name] ?? liveHRMap[p.name.replace(/\s+Jr\.?$/i,"").trim()];
+
+            // Live HR stats — tier 1 live API, tier 2 hardcoded, tier 3 Claude
+            const liveData = liveHRMap[p.name] ??
+              liveHRMap[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()];
             const knownHR  = KNOWN_2026_HR[p.name];
-            const correctedHR = liveHR != null ? liveHR
-                              : knownHR != null ? knownHR
-                              : (p.seasonHRs ?? null);
-            // Validate simHRs is reasonable (0-4000 range for most players)
+            const correctedHR  = liveData?.hr   ?? (knownHR != null ? knownHR : (p.seasonHRs ?? null));
+            const correctedGP  = liveData?.gp   ?? p.gamesPlayed ?? null;
+            const correctedAVG = liveData?.avg  ?? p.avg ?? null;
+            const correctedOPS = liveData?.ops  ?? p.ops ?? null;
+            const batterId     = liveData?.id   ?? p.mlbId ?? null;
+
+            // BvP from cache (populated by enrichBvP pass below)
+            const bvpKey = (batterId || p.name) + "_" + p.pitcher;
+            const bvp    = bvpCache[bvpKey];
+            const bvpStr = bvp
+              ? bvp.ab + " AB · " + bvp.avg + " AVG · " + bvp.hr + " HR · " + bvp.so + " K"
+              : (p.bvpSummary || "No BvP data");
+
+            // Validate simHRs
             const validSims = (p.simHRs != null && p.simHRs >= 0 && p.simHRs <= 5000)
               ? p.simHRs : null;
+
             return {
               ...p,
-              team: p.isHome ? teams.home : teams.away,
-              seasonHRs: correctedHR,
-              simHRs: validSims,
-              hotStreak: isHot,
-              hotNote: hotStreakMap[p.name] || "",
+              team:       p.isHome ? teams.home : teams.away,
+              mlbId:      batterId,
+              seasonHRs:  correctedHR,
+              gamesPlayed:correctedGP,
+              avg:        correctedAVG,
+              ops:        correctedOPS || p.ops,
+              bvpSummary: bvpStr,
+              bvpHR:      bvp?.hr ?? null,
+              bvpAB:      bvp?.ab ?? null,
+              bvpAVG:     bvp?.avg ?? null,
+              simHRs:     validSims,
+              hotStreak:  isHot,
+              hotNote:    hotStreakMap[p.name] || "",
               hrChancePct: isHot
                 ? Math.min(35, (p.hrChancePct ?? 0) + 2.5)
                 : (p.hrChancePct ?? 0),
@@ -1241,7 +1332,36 @@ export default function App() {
         newResults[key] = { players: cleanPlayers };
       });
 
-      setResults(newResults);
+      // ── BvP enrichment pass — fetch real BvP for each player/pitcher pair ──
+      pushLog("⚔️ Fetching live BvP stats from MLB API...");
+      const bvpFetches = [];
+      Object.values(newResults).forEach(gr => {
+        (gr.players ?? []).forEach(p => {
+          const batterId  = p.mlbId;
+          const pitcherName = p.pitcher;
+          const pitcherId = pitcherIdMap[pitcherName];
+          if (batterId && pitcherId) {
+            const cacheKey = batterId + "_" + pitcherName;
+            bvpFetches.push(
+              fetchBvP(batterId, pitcherId).then(bvp => {
+                if (bvp) {
+                  bvpCache[cacheKey] = bvp;
+                  // Update the player in place
+                  p.bvpSummary = bvp.ab + " AB · " + bvp.avg + " AVG · " + bvp.hr + " HR · " + bvp.so + " K";
+                  p.bvpHR  = bvp.hr;
+                  p.bvpAB  = bvp.ab;
+                  p.bvpAVG = bvp.avg;
+                }
+              })
+            );
+          }
+        });
+      });
+      await Promise.all(bvpFetches);
+      const bvpCount = Object.keys(bvpCache).length;
+      pushLog("✅ BvP data fetched — " + bvpCount + " matchup" + (bvpCount !== 1 ? "s" : "") + " with official stats");
+
+      setResults({...newResults}); // trigger re-render with BvP data
       setOpenGames(new Set(games.map(g => g.away + g.home)));
       pushLog("✅ All " + allGameResults.length + " games analyzed! Click any game to see HR %.");
       setPhase("done");
