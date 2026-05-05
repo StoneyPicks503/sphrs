@@ -1604,6 +1604,66 @@ export default function App() {
       const bvpCount = Object.keys(bvpCache).length;
       setStep("✅ BvP data fetched — " + bvpCount + " matchup" + (bvpCount !== 1 ? "s" : "") + " with official stats");
 
+      // ── FALLBACK: any game with 0 players gets filled from roster data ──
+      let filledCount = 0;
+      games.forEach(g => {
+        const key = g.away + g.home;
+        const existing = newResults[key]?.players ?? [];
+        if (existing.length >= 3) return; // already has enough
+
+        const gd = allGameData[key];
+        if (!gd) return;
+
+        // Get all hitters from both teams, sorted by HR
+        const candidates = [
+          ...(gd.awayHitters || []).map(h => ({ ...h, isHome: false })),
+          ...(gd.homeHitters || []).map(h => ({ ...h, isHome: true })),
+        ]
+        .filter(h => !injuredPlayers.has(h.name))
+        .filter(h => h.pos !== "P")
+        .sort((a, b) => (b.hr ?? 0) - (a.hr ?? 0));
+
+        const needed = 3 - existing.length;
+        const existingNames = new Set(existing.map(p => p.name.toLowerCase()));
+
+        const extras = candidates
+          .filter(h => !existingNames.has(h.name.toLowerCase()))
+          .slice(0, needed + 2) // grab a few extra for dedup safety
+          .map(h => {
+            const gameObj = g;
+            const pitcherName = h.isHome ? (gameObj?.awayP || "") : (gameObj?.homeP || "");
+            const pitcher = h.isHome ? gd.awayPitcher : gd.homePitcher;
+            const wBoost = weatherMap[key]?.fieldBoost ?? 0;
+            const simCount = runHRSimulation(h, pitcher, wBoost, 1000);
+            const w = weatherMap[key];
+            return {
+              name:          h.name,
+              team:          h.isHome ? g.home : g.away,
+              isHome:        h.isHome,
+              mlbId:         h.id ?? null,
+              seasonHRs:     h.hr ?? 0,
+              gamesPlayed:   h.gp ?? 0,
+              ops:           h.ops ?? null,
+              avg:           h.avg ?? null,
+              pitcher:       pitcherName,
+              hrChancePct:   Math.min(20, Math.max(3, (h.hr ?? 0) * 0.6)),
+              confidence:    60,
+              simHRs:        Math.min(Math.round(simCount), 1000),
+              bvpSummary:    "No BvP data",
+              bvpHR:         null, bvpAB: null, bvpAVG: null,
+              weatherInsight: w ? w.tempF + "°F · " + w.windSpeed + "mph " + w.windDir + " (" + (w.windVsField||"?") + ")" : "",
+            };
+          });
+
+        const merged = [...existing, ...extras].slice(0, 3);
+        if (merged.length > existing.length) {
+          newResults[key] = { players: merged };
+          filledCount++;
+          console.log("Fallback filled", g.away + "@" + g.home, "→", merged.length, "players");
+        }
+      });
+      if (filledCount > 0) setStep("✅ Filled " + filledCount + " game(s) using roster data fallback");
+
       setResults({...newResults}); // trigger re-render with BvP data
       setOpenGames(new Set(games.map(g => g.away + g.home)));
       setStep("✅ All " + allGameResults.length + " games analyzed! Click any game to see HR %.");
