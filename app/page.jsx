@@ -1589,10 +1589,19 @@ export default function App() {
             const batterId = BATTER_IDS[p.name] ?? BATTER_IDS[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()] ?? roster?.id ?? live?.id ?? p.mlbId ?? null;
             // BvP from API cache
             // Determine which pitcher this batter faces (opposing SP from game data)
-            const gameObj  = games.find(g => g.away + g.home === gameKey2);
+            const gameObj    = games.find(g => g.away + g.home === gameKey2);
             const pitcherName = p.isHome
               ? (gameObj?.awayP || p.pitcher || "")
               : (gameObj?.homeP || p.pitcher || "");
+            const pitcherHand = p.isHome
+              ? (gameObj?.awayH || "")
+              : (gameObj?.homeH || "");
+            const pitcherERA  = p.isHome
+              ? (gameObj?.awayERA ?? null)
+              : (gameObj?.homeERA ?? null);
+            // Get WHIP from pre-fetched pitcher data
+            const pitcherObj  = p.isHome ? gd2?.awayPitcher : gd2?.homePitcher;
+            const pitcherWhip = pitcherObj?.whip ?? null;
             const bvpKey   = batterId + "_" + pitcherName;
             const bvp      = bvpCache[bvpKey];
             const bvpStr   = bvp
@@ -1617,6 +1626,9 @@ export default function App() {
               ops,
               avg,
               pitcher:      pitcherName,
+              pitcherHand:  pitcherHand,
+              pitcherERA:   pitcherERA,
+              pitcherWhip:  pitcherWhip,
               bvpSummary:   bvpStr,
               bvpHR:        bvp?.hr ?? null,
               bvpAB:        bvp?.ab ?? null,
