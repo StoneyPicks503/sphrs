@@ -1349,35 +1349,35 @@ export default function App() {
         // NYM
         "Juan Soto":"NYM","Francisco Lindor":"NYM","Mark Vientos":"NYM","Brandon Nimmo":"NYM","Jeff McNeil":"NYM",
         // COL
-        "Ezequiel Tovar":"COL","Brenton Doyle":"COL","Ryan McMahon":"COL","Charlie Blackmon":"COL",
+        "Ezequiel Tovar":"COL","Brenton Doyle":"COL","Ryan McMahon":"COL","Charlie Blackmon":"COL","Michael Lorenzen":"COL",
         // PHI
-        "Bryce Harper":"PHI","Kyle Schwarber":"PHI","Trea Turner":"PHI","Nick Castellanos":"PHI","J.T. Realmuto":"PHI","JT Realmuto":"PHI",
+        "Bryce Harper":"PHI","Kyle Schwarber":"PHI","Trea Turner":"PHI","Nick Castellanos":"PHI","J.T. Realmuto":"PHI","JT Realmuto":"PHI","Cristopher Sanchez":"PHI",
         // MIA
-        "Jorge Soler":"MIA","Luis Arraez":"MIA","Jake Burger":"MIA","Connor Norby":"MIA",
+        "Jorge Soler":"MIA","Luis Arraez":"MIA","Jake Burger":"MIA","Connor Norby":"MIA","Sandy Alcantara":"MIA",
         // TOR
-        "Vladimir Guerrero Jr":"TOR","Bo Bichette":"TOR","George Springer":"TOR","Daulton Varsho":"TOR",
+        "Vladimir Guerrero Jr":"TOR","Bo Bichette":"TOR","George Springer":"TOR","Daulton Varsho":"TOR","Kevin Gausman":"TOR",
         // TB
-        "Junior Caminero":"TB","Josh Lowe":"TB","Yandy Diaz":"TB","Christopher Morel":"TB",
+        "Junior Caminero":"TB","Josh Lowe":"TB","Yandy Diaz":"TB","Christopher Morel":"TB","Drew Rasmussen":"TB",
         // BOS
         "Alex Bregman":"BOS","Jarren Duran":"BOS","Triston Casas":"BOS","Masataka Yoshida":"BOS","Rob Refsnyder":"BOS","Wilyer Abreu":"BOS",
         // DET
-        "Spencer Torkelson":"DET","Riley Greene":"DET","Kerry Carpenter":"DET","Zach McKinstry":"DET","Matt Vierling":"DET",
+        "Spencer Torkelson":"DET","Riley Greene":"DET","Kerry Carpenter":"DET","Zach McKinstry":"DET","Matt Vierling":"DET","Framber Valdez":"DET",
         // CIN
-        "Elly De La Cruz":"CIN","Tyler Stephenson":"CIN","Jonathan India":"CIN","TJ Friedl":"CIN",
+        "Elly De La Cruz":"CIN","Tyler Stephenson":"CIN","Jonathan India":"CIN","TJ Friedl":"CIN","Andrew Abbott":"CIN",
         // CHC
-        "Ian Happ":"CHC","Pete Crow-Armstrong":"CHC","Seiya Suzuki":"CHC","Michael Busch":"CHC","Dansby Swanson":"CHC",
+        "Ian Happ":"CHC","Pete Crow-Armstrong":"CHC","Seiya Suzuki":"CHC","Michael Busch":"CHC","Dansby Swanson":"CHC","Jameson Taillon":"CHC",
         // BAL
-        "Gunnar Henderson":"BAL","Pete Alonso":"BAL","Cedric Mullins":"BAL","Adley Rutschman":"BAL","Anthony Santander":"BAL","Colton Cowser":"BAL",
+        "Gunnar Henderson":"BAL","Pete Alonso":"BAL","Cedric Mullins":"BAL","Adley Rutschman":"BAL","Anthony Santander":"BAL","Colton Cowser":"BAL","Chris Bassitt":"BAL",
         // NYY
-        "Aaron Judge":"NYY","Ben Rice":"NYY","Paul Goldschmidt":"NYY","Cody Bellinger":"NYY","Jazz Chisholm":"NYY","Anthony Volpe":"NYY","Gleyber Torres":"NYY","Austin Wells":"NYY",
+        "Aaron Judge":"NYY","Ben Rice":"NYY","Paul Goldschmidt":"NYY","Cody Bellinger":"NYY","Jazz Chisholm":"NYY","Anthony Volpe":"NYY","Gleyber Torres":"NYY","Austin Wells":"NYY","Elmer Rodriguez":"NYY",
         // CLE
-        "Jose Ramirez":"CLE","Steven Kwan":"CLE","Josh Naylor":"CLE","Lane Thomas":"CLE","David Fry":"CLE",
+        "Jose Ramirez":"CLE","Steven Kwan":"CLE","Josh Naylor":"CLE","Lane Thomas":"CLE","David Fry":"CLE","Gavin Williams":"CLE",
         // KC
-        "Bobby Witt Jr":"KC","Vinnie Pasquantino":"KC","Salvador Perez":"KC","MJ Melendez":"KC","Hunter Renfroe":"KC",
+        "Bobby Witt Jr":"KC","Vinnie Pasquantino":"KC","Salvador Perez":"KC","MJ Melendez":"KC","Hunter Renfroe":"KC","Stephen Kolek":"KC",
         // MIL
-        "Jackson Chourio":"MIL","William Contreras":"MIL","Christian Yelich":"MIL","Joey Wiemer":"MIL","Rhys Hoskins":"MIL",
+        "Jackson Chourio":"MIL","William Contreras":"MIL","Christian Yelich":"MIL","Joey Wiemer":"MIL","Rhys Hoskins":"MIL","Brandon Sproat":"MIL",
         // STL
-        "Nolan Arenado":"STL","Jordan Walker":"STL","Lars Nootbaar":"STL","Brendan Donovan":"STL","Paul DeJong":"STL",
+        "Nolan Arenado":"STL","Jordan Walker":"STL","Lars Nootbaar":"STL","Brendan Donovan":"STL","Paul DeJong":"STL","Andre Pallante":"STL",
         // LAD
         "Shohei Ohtani":"LAD","Mookie Betts":"LAD","Freddie Freeman":"LAD","Will Smith":"LAD","Teoscar Hernandez":"LAD","Max Muncy":"LAD","Gavin Lux":"LAD",
         // HOU
@@ -1393,19 +1393,33 @@ export default function App() {
         // SD
         "Fernando Tatis Jr":"SD","Manny Machado":"SD","Jake Cronenworth":"SD","Ha-Seong Kim":"SD","Jackson Merrill":"SD",
         // SF
-        "Rafael Devers":"SF","Willy Adames":"SF","Matt Chapman":"SF","Heliot Ramos":"SF","Mike Yastrzemski":"SF","Patrick Bailey":"SF",
+        "Rafael Devers":"SF","Willy Adames":"SF","Matt Chapman":"SF","Heliot Ramos":"SF","Mike Yastrzemski":"SF","Patrick Bailey":"SF","Logan Webb":"SF","Walker Buehler":"SF",
         // ATH
-        "Nick Kurtz":"ATH","Shea Langeliers":"ATH","Brent Rooker":"ATH","JJ Bleday":"ATH",
+        "Nick Kurtz":"ATH","Shea Langeliers":"ATH","Brent Rooker":"ATH","JJ Bleday":"ATH","Luis Severino":"ATH",
         // WSH
-        "James Wood":"WSH","CJ Abrams":"WSH","Keibert Ruiz":"WSH","Jesse Winker":"WSH",
+        "James Wood":"WSH","CJ Abrams":"WSH","Keibert Ruiz":"WSH","Jesse Winker":"WSH","Cade Cavalli":"WSH",
         // MIN
-        "Byron Buxton":"MIN","Carlos Correa":"MIN","Ryan Jeffers":"MIN","Matt Wallner":"MIN","Edouard Julien":"MIN",
+        "Byron Buxton":"MIN","Carlos Correa":"MIN","Ryan Jeffers":"MIN","Matt Wallner":"MIN","Edouard Julien":"MIN","Taj Bradley":"MIN",
         // TEX
-        "Nathaniel Lowe":"TEX","Adolis Garcia":"TEX","Jonah Heim":"TEX","Wyatt Langford":"TEX",
+        "Nathaniel Lowe":"TEX","Adolis Garcia":"TEX","Jonah Heim":"TEX","Wyatt Langford":"TEX","Jacob deGrom":"TEX","Marcus Semien":"TEX",
         // PIT
-        "Oneil Cruz":"PIT","Bryan Reynolds":"PIT","Andrew McCutchen":"PIT","Nick Gonzales":"PIT",
+        "Oneil Cruz":"PIT","Bryan Reynolds":"PIT","Nick Gonzales":"PIT","Rowdy Tellez":"PIT","Bubba Chandler":"PIT","Andrew McCutchen":"PIT",
         // AZ
-        "Ketel Marte":"AZ","Corbin Carroll":"AZ","Christian Walker":"AZ","Lourdes Gurriel Jr":"AZ",
+        "Ketel Marte":"AZ","Corbin Carroll":"AZ","Christian Walker":"AZ","Lourdes Gurriel Jr":"AZ","Eduardo Rodriguez":"AZ","Josh Bell":"AZ",
+        // SD
+        "Fernando Tatis Jr":"SD","Manny Machado":"SD","Jake Cronenworth":"SD","Ha-Seong Kim":"SD","Jackson Merrill":"SD","Walker Buehler":"SD",
+        // HOU
+        "Yordan Alvarez":"HOU","Jose Altuve":"HOU","Yainer Diaz":"HOU","Chas McCormick":"HOU","Jeremy Pena":"HOU","Peter Lambert":"HOU",
+        // LAD
+        "Shohei Ohtani":"LAD","Mookie Betts":"LAD","Freddie Freeman":"LAD","Will Smith":"LAD","Teoscar Hernandez":"LAD","Max Muncy":"LAD",
+        // LAA
+        "Mike Trout":"LAA","Taylor Ward":"LAA","Zach Neto":"LAA","Logan O'Hoppe":"LAA","Sam Aldegheri":"LAA",
+        // CWS
+        "Munetaka Murakami":"CWS","Andrew Vaughn":"CWS","Korey Lee":"CWS","Erick Fedde":"CWS",
+        // SEA
+        "Julio Rodriguez":"SEA","Randy Arozarena":"SEA","Cal Raleigh":"SEA","Luke Raley":"SEA","George Kirby":"SEA",
+        // ATL
+        "Matt Olson":"ATL","Austin Riley":"ATL","Ozzie Albies":"ATL","Sean Murphy":"ATL","Michael Harris II":"ATL","Bryce Elder":"ATL",
       };
 
       // Build lookup maps from verification results
@@ -1439,85 +1453,47 @@ export default function App() {
         const validTeams = new Set([teams.away, teams.home]);
 
         const cleanPlayers = (gr.players ?? [])
-          // 1. Team validation — only remove if we KNOW the player is on wrong team
-          .filter(p => {
-            if (!p.team) { p.team = teams.away; return true; } // give benefit of doubt
-
-            // Fuzzy name match in PLAYER_TEAMS — try full name, no-suffix, trimmed
-            const variants = [
-              p.name,
-              p.name.replace(/\s+Jr\.?$/i, "").trim(),
-              p.name.replace(/\s+Sr\.?$/i, "").trim(),
-              p.name.split(" ").slice(0, 2).join(" "), // first + last only
-            ];
-            let knownTeam = null;
-            for (const v of variants) {
-              if (PLAYER_TEAMS[v]) { knownTeam = PLAYER_TEAMS[v]; break; }
-            }
-
-            if (knownTeam) {
-              if (!validTeams.has(knownTeam)) {
-                // 100% certain wrong game — remove
-                setStep("⚠️ " + p.name + " is on " + knownTeam + " not playing in " + teams.away + "@" + teams.home);
-                return false;
-              }
-              // Correct team/isHome assignment
-              p.team = knownTeam;
-              p.isHome = knownTeam === teams.home;
-              return true;
-            }
-
-            // Player not in our lookup — allow through if Claude's team is valid
-            // Don't remove unknowns or we lose too many players
-            if (validTeams.has(p.team)) return true;
-            // If Claude assigned an invalid team, correct it to the more likely team
-            // based on isHome flag rather than removing the player entirely
-            p.team = p.isHome ? teams.home : teams.away;
-            return true;
-          })
-          // 2. Remove confirmed pitchers from verification pass
+          // 1. Must have a name
+          .filter(p => !!p.name && p.name.trim().length > 1)
+          // 2. Remove confirmed pitchers from verification pass only
           .filter(p => !flaggedNames.has(p.name))
-          // 3. Remove injured players (on IL)
+          // 3. Remove players confirmed on IL
           .filter(p => {
-            const variants = [
-              p.name,
-              p.name.replace(/\s+Jr\.?$/i, "").trim(),
-              p.name.replace(/\s+Sr\.?$/i, "").trim(),
-            ];
-            const isInjured = variants.some(v => injuredPlayers.has(v));
-            if (isInjured) setStep("🏥 " + p.name + " on IL — removed from picks");
+            const isInjured = [p.name, p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()]
+              .some(v => injuredPlayers.has(v));
+            if (isInjured) console.log("IL removed:", p.name);
             return !isInjured;
           })
-          // 3. Dedup within this game only (same player can't appear twice in one game)
-          // Note: we allow same player across different games — dedup only within game
-          .filter((p, idx, arr) => {
-            const key2 = p.name.toLowerCase().trim()
-              .replace(/\s+jr\.?$/i, "")
-              .replace(/\s+sr\.?$/i, "")
-              .trim();
-            // Check for duplicates within this game's array only
-            return arr.findIndex(x =>
-              x.name.toLowerCase().trim().replace(/\s+jr\.?$/i,"").trim() === key2
-            ) === idx;
-          })
-          // Cross-game dedup — prevent exact same player in 2+ different games
+          // 4. PLAYER_TEAMS check — only reject if we KNOW they play for a DIFFERENT team NOT in this game
           .filter(p => {
-            const key2 = p.name.toLowerCase().trim()
-              .replace(/\s+jr\.?$/i, "")
-              .replace(/\s+sr\.?$/i, "")
-              .trim();
-            if (seenPlayers.has(key2)) return false;
-            seenPlayers.add(key2);
+            const variants = [p.name, p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim(), p.name.split(" ").slice(0,2).join(" ")];
+            let knownTeam = null;
+            for (const v of variants) { if (PLAYER_TEAMS[v]) { knownTeam = PLAYER_TEAMS[v]; break; } }
+            if (knownTeam && !validTeams.has(knownTeam)) {
+              console.log("Wrong team removed:", p.name, knownTeam, "not in", teams.away, teams.home);
+              return false; // definitively on wrong team
+            }
+            if (knownTeam) { p.team = knownTeam; p.isHome = knownTeam === teams.home; }
+            else { // Unknown player — correct team from isHome flag, keep them
+              p.team = p.isHome ? teams.home : teams.away;
+            }
             return true;
           })
-          // 4. Attach live stats, BvP cache lookup, hot streak
+          // 5. Within-game dedup only
+          .filter((p, i, arr) => {
+            const k = p.name.toLowerCase().replace(/\s+(jr|sr)\.?$/i,"").trim();
+            return arr.findIndex(x => x.name.toLowerCase().replace(/\s+(jr|sr)\.?$/i,"").trim() === k) === i;
+          })
+          // 6. Cross-game dedup
+          .filter(p => {
+            const k = p.name.toLowerCase().replace(/\s+(jr|sr)\.?$/i,"").trim();
+            if (seenPlayers.has(k)) return false;
+            seenPlayers.add(k);
+            return true;
+          })
+          // 7. Attach live stats + hot streak
           .map(p => {
             const isHot = !!hotStreakMap[p.name];
-
-            // Tier 1: pre-fetched roster data (most accurate — from MLB API roster)
-            // Tier 2: league-wide HR leaderboard from MLB API
-            // Tier 3: hardcoded verified fallback
-            // Tier 4: Claude's estimate
             const gameKey2 = gr.away + gr.home;
             const gd2 = allGameData[gameKey2];
             const allHitters = [...(gd2?.awayHitters || []), ...(gd2?.homeHitters || [])];
@@ -1525,44 +1501,33 @@ export default function App() {
               h.name === p.name ||
               h.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim() === p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()
             );
-            const liveData = liveHRMap[p.name] ??
-              liveHRMap[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()];
+            const liveData = liveHRMap[p.name] ?? liveHRMap[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()];
             const knownHR  = KNOWN_2026_HR[p.name];
             const correctedHR  = rosterData?.hr ?? liveData?.hr ?? (knownHR != null ? knownHR : (p.seasonHRs ?? null));
             const correctedGP  = rosterData?.gp ?? liveData?.gp ?? p.gamesPlayed ?? null;
-            const correctedAVG = rosterData?.avg ?? liveData?.avg ?? p.avg ?? null;
             const correctedOPS = rosterData?.ops ?? liveData?.ops ?? p.ops ?? null;
             const batterId     = rosterData?.id  ?? liveData?.id  ?? p.mlbId ?? null;
-
-            // BvP from cache (populated by enrichBvP pass below)
             const bvpKey = (batterId || p.name) + "_" + p.pitcher;
             const bvp    = bvpCache[bvpKey];
             const bvpStr = bvp
-              ? bvp.ab + " AB · " + bvp.avg + " AVG · " + bvp.hr + " HR · " + bvp.so + " K"
+              ? bvp.ab + " AB · " + bvp.avg + " AVG · " + bvp.hr + " HR"
               : (p.bvpSummary || "No BvP data");
-
-            // Validate simHRs
-            const validSims = (p.simHRs != null && p.simHRs >= 0 && p.simHRs <= 5000)
-              ? p.simHRs : null;
-
+            const validSims = (p.simHRs != null && p.simHRs >= 0 && p.simHRs <= 5000) ? p.simHRs : null;
             return {
               ...p,
-              team:       p.isHome ? teams.home : teams.away,
-              mlbId:      batterId,
-              seasonHRs:  correctedHR,
-              gamesPlayed:correctedGP,
-              avg:        correctedAVG,
-              ops:        correctedOPS || p.ops,
-              bvpSummary: bvpStr,
-              bvpHR:      bvp?.hr ?? null,
-              bvpAB:      bvp?.ab ?? null,
-              bvpAVG:     bvp?.avg ?? null,
-              simHRs:     validSims,
-              hotStreak:  isHot,
-              hotNote:    hotStreakMap[p.name] || "",
-              hrChancePct: isHot
-                ? Math.min(35, (p.hrChancePct ?? 0) + 2.5)
-                : (p.hrChancePct ?? 0),
+              team:        p.isHome ? teams.home : teams.away,
+              mlbId:       batterId,
+              seasonHRs:   correctedHR,
+              gamesPlayed: correctedGP,
+              ops:         correctedOPS || p.ops,
+              bvpSummary:  bvpStr,
+              bvpHR:       bvp?.hr ?? null,
+              bvpAB:       bvp?.ab ?? null,
+              bvpAVG:      bvp?.avg ?? null,
+              simHRs:      validSims,
+              hotStreak:   isHot,
+              hotNote:     hotStreakMap[p.name] || "",
+              hrChancePct: isHot ? Math.min(35, (p.hrChancePct ?? 0) + 2.5) : (p.hrChancePct ?? 0),
             };
           })
           .sort((a, b) => (b.hrChancePct ?? 0) - (a.hrChancePct ?? 0))
