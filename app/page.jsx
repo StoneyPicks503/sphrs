@@ -1031,8 +1031,9 @@ function buildPrompt(games, weatherMap = {}, gameData = {}) {
         (w.hrImpact === "positive" ? " HR-BOOST" : w.hrImpact === "negative" ? " HR-SUPPRESS" : "");
     }),
     "",
-    "TASK: For EACH game return exactly 3 HR candidates from the TWO TEAMS in THAT specific game (best HR spots first — mix both teams).",
+    "TASK: For EACH game return exactly 5 HR candidates from the TWO TEAMS in THAT specific game (best HR spots first — mix both teams). Return 5 so filters have buffer.",
     "CRITICAL: ONLY include POSITION PLAYERS (batters). NEVER include pitchers as HR candidates.",
+    "Return 5 players per game even if some are marginal — filters will trim to the best 3.",
     "CRITICAL: Do NOT include any player who is on the Injured List (IL) or listed as Day-To-Day (DTD).",
     "Do NOT suggest: Ronald Acuna Jr, any player known to be injured heading into May 4 2026.",
     "CRITICAL: Every player MUST play for either the away team OR the home team of their specific game. No cross-game players.",
@@ -1125,12 +1126,14 @@ export default function App() {
     { match:"players on IL",            pct:46, label:"Injury report loaded ✅" },
     { match:"Analyzing BvP",            pct:50, label:"Analyzing BvP matchups..." },
     { match:"Monte Carlo",              pct:55, label:"Running 10,000× simulations..." },
-    { match:"Analyzing batch 1",        pct:60, label:"Claude analyzing batch 1..." },
-    { match:"Batch 1 done",             pct:68, label:"Batch 1 complete ✅" },
-    { match:"Analyzing batch 2",        pct:70, label:"Claude analyzing batch 2..." },
-    { match:"Batch 2 done",             pct:78, label:"Batch 2 complete ✅" },
-    { match:"Analyzing batch 3",        pct:80, label:"Claude analyzing batch 3..." },
-    { match:"Batch 3 done",             pct:84, label:"Batch 3 complete ✅" },
+    { match:"Analyzing batch 1",        pct:58, label:"Claude analyzing batch 1 of 4..." },
+    { match:"Batch 1 done",             pct:64, label:"Batch 1 complete ✅" },
+    { match:"Analyzing batch 2",        pct:66, label:"Claude analyzing batch 2 of 4..." },
+    { match:"Batch 2 done",             pct:72, label:"Batch 2 complete ✅" },
+    { match:"Analyzing batch 3",        pct:74, label:"Claude analyzing batch 3 of 4..." },
+    { match:"Batch 3 done",             pct:80, label:"Batch 3 complete ✅" },
+    { match:"Analyzing batch 4",        pct:82, label:"Claude analyzing batch 4 of 4..." },
+    { match:"Batch 4 done",             pct:86, label:"Batch 4 complete ✅" },
     { match:"Verifying positions",      pct:86, label:"Verifying rosters & positions..." },
     { match:"All players verified",     pct:90, label:"All players verified ✅" },
     { match:"Fetching live BvP",        pct:92, label:"Fetching official BvP stats..." },
@@ -1485,9 +1488,20 @@ export default function App() {
             if (isInjured) setStep("🏥 " + p.name + " on IL — removed from picks");
             return !isInjured;
           })
-          // 3. Global dedup — prevent same player in two games
+          // 3. Dedup within this game only (same player can't appear twice in one game)
+          // Note: we allow same player across different games — dedup only within game
+          .filter((p, idx, arr) => {
+            const key2 = p.name.toLowerCase().trim()
+              .replace(/\s+jr\.?$/i, "")
+              .replace(/\s+sr\.?$/i, "")
+              .trim();
+            // Check for duplicates within this game's array only
+            return arr.findIndex(x =>
+              x.name.toLowerCase().trim().replace(/\s+jr\.?$/i,"").trim() === key2
+            ) === idx;
+          })
+          // Cross-game dedup — prevent exact same player in 2+ different games
           .filter(p => {
-            // Use fuzzy key so "Bobby Witt" and "Bobby Witt Jr" count as same
             const key2 = p.name.toLowerCase().trim()
               .replace(/\s+jr\.?$/i, "")
               .replace(/\s+sr\.?$/i, "")
