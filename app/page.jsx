@@ -1045,9 +1045,11 @@ function buildPrompt(games, weatherMap = {}, gameData = {}) {
     "BOS@DET: Riley Greene 82, Spencer Torkelson 71, Kerry Carpenter 65",
     "NYY@TEX: Aaron Judge 90, Jazz Chisholm 72, Anthony Volpe 61",
     "",
-    "Format: AWAY@HOME: PlayerName SCORE, PlayerName SCORE, PlayerName SCORE",
-    "SCORE = your confidence 0-100. ONLY position players. ONLY players on those two teams.",
-    "No extra text. No explanations. Just the lines.",
+    "Format: AWAY@HOME: FirstName LastName SCORE, FirstName LastName SCORE, FirstName LastName SCORE",
+    "SCORE = confidence 0-100. EXACTLY 3 players per line, ALWAYS.",
+    "ONLY position players (outfielders, infielders, catchers, DH). NO pitchers ever.",
+    "ONLY players on the two teams listed. NO extra text, NO explanations, NO numbering.",
+    "If unsure who plays for a team, pick their known star hitters.",
   ].join("\n");
 }
 
@@ -1200,36 +1202,76 @@ export default function App() {
         const raw = await callClaude(buildPrompt(batches[b], weatherMap, batchGameData), 2000);
         // Parse plain text format: "BOS@DET: Riley Greene 82, Spencer Torkelson 71, Kerry Carpenter 65"
         const batchResults = [];
-        const lines = raw.split("\n").map(l => l.trim()).filter(l => l.includes("@") && l.includes(":"));
-        lines.forEach(line => {
-          const colonIdx = line.indexOf(":");
-          const gamePart = line.slice(0, colonIdx).trim(); // "BOS@DET"
-          const playersPart = line.slice(colonIdx + 1).trim();
-          const [away, home] = gamePart.split("@");
-          if (!away || !home) return;
-          // Match game to our batch
-          const game = batches[b].find(g =>
-            g.away.toUpperCase() === away.toUpperCase() &&
-            g.home.toUpperCase() === home.toUpperCase()
-          );
+
+        // Build map of valid game keys in this batch for quick lookup
+        const batchGameKeys = {};
+        batches[b].forEach(g => {
+          batchGameKeys[g.away.toUpperCase() + "@" + g.home.toUpperCase()] = g;
+          batchGameKeys[g.home.toUpperCase() + "@" + g.away.toUpperCase()] = g; // allow reversed
+        });
+
+        // Split on newlines, also handle if Claude uses numbered lines or bullets
+        const rawLines = raw.replace(/^[\d]+\./gm, "").replace(/^[-•*]/gm, "").split("\n");
+
+        rawLines.forEach(line => {
+          line = line.trim();
+          if (!line.includes("@") || !line.includes(":")) return;
+
+          // Find the game key - handle formats like "BOS@DET:", "1. BOS@DET:", "**BOS@DET**:"
+          const gameMatch = line.match(/([A-Z]{2,3})[@]([A-Z]{2,3})/);
+          if (!gameMatch) return;
+
+          const away = gameMatch[1];
+          const home = gameMatch[2];
+          const game = batchGameKeys[away + "@" + home] ||
+                       batches[b].find(g => g.away === away && g.home === home);
           if (!game) return;
-          // Parse players: "Riley Greene 82, Spencer Torkelson 71"
-          const playerEntries = playersPart.split(",").map(p => p.trim()).filter(Boolean);
-          const players = playerEntries.slice(0, 3).map(entry => {
-            const parts = entry.trim().split(" ");
-            const score = parseInt(parts[parts.length - 1]);
-            const name  = isNaN(score) ? entry.trim() : parts.slice(0, -1).join(" ");
-            const conf  = isNaN(score) ? 70 : score;
+
+          // Get everything after the first colon
+          const colonIdx = line.indexOf(":");
+          const playersPart = line.slice(colonIdx + 1).trim();
+
+          // Split players — handle both comma and semicolon separators
+          const playerEntries = playersPart
+            .split(/[,;]/)
+            .map(p => p.trim())
+            .filter(p => p.length > 2 && /[A-Za-z]/.test(p));
+
+          const players = playerEntries.slice(0, 5).map(entry => {
+            // Strip any leading/trailing punctuation or numbers that aren't part of name
+            entry = entry.replace(/^[\d.\-•*]+\s*/, "").trim();
+            // Extract trailing score number (e.g. "Aaron Judge 85" or "Aaron Judge (85)")
+            const scoreMatch = entry.match(/[\s(]+(\d{2,3})[)\s]*$/);
+            const conf  = scoreMatch ? parseInt(scoreMatch[1]) : 72;
+            const name  = scoreMatch
+              ? entry.slice(0, entry.lastIndexOf(scoreMatch[0])).trim()
+              : entry.replace(/\d+$/, "").trim();
+            // Clean up name — remove parentheses, dots, extra spaces
+            const cleanName = name.replace(/[()]/g, "").replace(/\s+/g, " ").trim();
+            if (cleanName.length < 3 || cleanName.split(" ").length < 2) return null;
             return {
-              name:        name.trim(),
-              team:        "",  // will be set by validation
+              name:        cleanName,
+              team:        "",
               isHome:      null,
-              hrChancePct: Math.round(conf / 4), // convert 0-100 → 0-25 range
+              hrChancePct: Math.min(25, Math.round(conf / 4)),
               confidence:  conf,
             };
-          }).filter(p => p.name.length > 2);
+          }).filter(Boolean);
+
           if (players.length > 0) {
-            batchResults.push({ away: away.toUpperCase(), home: home.toUpperCase(), players });
+            batchResults.push({
+              away: game.away,
+              home: game.home,
+              players,
+            });
+          }
+        });
+
+        // If any game in this batch got 0 results, add placeholder so it shows up
+        batches[b].forEach(g => {
+          const found = batchResults.find(r => r.away === g.away && r.home === g.home);
+          if (!found) {
+            console.warn("No players parsed for", g.away + "@" + g.home, "— raw:", raw.slice(0, 200));
           }
         });
         allGameResults.push(...batchResults);
