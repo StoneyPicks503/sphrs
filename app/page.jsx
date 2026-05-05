@@ -845,77 +845,49 @@ function PlayerRow({ p, rank, delay = 0 }) {
 
       {/* Expanded detail */}
       {expanded && (
-        <div style={{ padding: "0 12px 12px 12px", borderTop: "1px solid " + T.border }}>
-          <div style={{ marginTop: 10, display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
-            {/* 2026 season HR — live from MLB API */}
-            <div style={{ width:"100%", background:"rgba(0,229,255,0.08)", border:"1px solid rgba(0,229,255,0.3)", borderRadius:7, padding:"5px 10px", marginBottom:4, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-              <span style={{ fontFamily:F.mono, fontSize:9, color:T.muted }}>2026 SEASON <span style={{ color:"#00e676", fontSize:7 }}>● LIVE</span></span>
-              <span style={{ fontFamily:F.arch, fontSize:13, color:T.accent }}>
+        <div style={{ padding: "0 12px 14px 12px", borderTop: "1px solid " + T.border }}>
+          <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 7 }}>
+
+            {/* 1 — 2026 Season HR */}
+            <div style={{ background:"rgba(0,229,255,0.07)", border:"1px solid rgba(0,229,255,0.25)", borderRadius:8, padding:"8px 12px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <span style={{ fontFamily:F.mono, fontSize:9, color:T.muted, letterSpacing:1 }}>2026 SEASON <span style={{ color:"#00e676", fontSize:7 }}>● LIVE</span></span>
+              <span style={{ fontFamily:F.arch, fontSize:14, color:T.accent }}>
                 {p.seasonHRs ?? "—"} HR
-                <span style={{ fontFamily:F.mono, fontSize:9, color:T.muted, marginLeft:6 }}>in {p.gamesPlayed ?? "—"}g · {p.avg ?? p.ops ?? ""}</span>
+                <span style={{ fontFamily:F.mono, fontSize:9, color:T.muted, marginLeft:6 }}>in {p.gamesPlayed ?? "—"}g</span>
               </span>
             </div>
-            {/* BvP vs today's pitcher — live from MLB API */}
-            <div style={{ width:"100%", background:"rgba(255,202,40,0.07)", border:"1px solid rgba(255,202,40,0.3)", borderRadius:7, padding:"5px 10px", marginBottom:4, display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:4 }}>
-              <span style={{ fontFamily:F.mono, fontSize:9, color:T.amber }}>
-                vs {p.pitcher || "today's pitcher"} <span style={{ color:"#00e676", fontSize:7 }}>● LIVE BvP</span>
+
+            {/* 2 — BvP */}
+            <div style={{ background:"rgba(255,202,40,0.07)", border:"1px solid rgba(255,202,40,0.25)", borderRadius:8, padding:"8px 12px", display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:4 }}>
+              <span style={{ fontFamily:F.mono, fontSize:9, color:T.amber, letterSpacing:1 }}>
+                vs {(p.pitcher||"Pitcher")} {p.pitcherHand ? "("+p.pitcherHand+")" : ""} ERA {p.pitcherERA ?? "N/A"}
+                <span style={{ color:"#00e676", fontSize:7, marginLeft:5 }}>● LIVE BvP</span>
               </span>
-              <span style={{ fontFamily:F.mono, fontSize:10, color:T.text }}>
+              <span style={{ fontFamily:F.mono, fontSize:11, color:T.text }}>
                 {(p.bvpAB != null && p.bvpAB > 0)
-                  ? <>{p.bvpAB} AB · <span style={{ color:T.amber }}>{p.bvpAVG || ".000"} AVG</span> · <span style={{ color:"#00e676" }}>{p.bvpHR ?? 0} HR</span></>
-                  : p.bvpSummary && p.bvpSummary !== "No BvP data"
-                    ? p.bvpSummary
-                    : <span style={{ color:T.muted }}>First career matchup</span>
-                }
+                  ? <>{p.bvpAB} AB · <span style={{ color:T.amber }}>{p.bvpAVG || ".000"} AVG</span> · <span style={{ color:"#00e676", fontWeight:700 }}>{p.bvpHR ?? 0} HR</span></>
+                  : <span style={{ color:T.muted }}>First career matchup</span>}
               </span>
             </div>
-            {/* Sim result banner */}
-            {p.simHRs != null && (
-              <div style={{ width:"100%", background:"rgba(0,230,118,0.08)", border:"1px solid rgba(0,230,118,0.3)", borderRadius:7, padding:"5px 10px", marginBottom:4, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                <span style={{ fontFamily:F.mono, fontSize:9, color:"#00e676" }}>1,000× SIM ● REAL STATS</span>
-                <span style={{ fontFamily:F.arch, fontSize:13, color:"#00e676" }}>
-                  {((p.simHRs/1000)*100).toFixed(1)}%
-                  <span style={{ fontFamily:F.mono, fontSize:9, color:T.muted, marginLeft:6 }}>{p.simHRs}/1k trials</span>
-                </span>
+
+            {/* 3 — Weather */}
+            {p.weatherInsight && (
+              <div style={{ background:"rgba(0,230,118,0.06)", border:"1px solid rgba(0,230,118,0.2)", borderRadius:8, padding:"8px 12px" }}>
+                <span style={{ fontFamily:F.mono, fontSize:9, color:"#00e676", letterSpacing:1 }}>🌤 WEATHER</span>
+                <div style={{ fontFamily:F.mono, fontSize:10, color:T.muted, marginTop:3, lineHeight:1.5 }}>{p.weatherInsight}</div>
               </div>
             )}
-            {[
-              ["vs", (p.pitcher||"Pitcher") + (p.pitcherHand ? " (" + p.pitcherHand + ")" : "") + " ERA " + (p.pitcherERA ?? "N/A"), T.amber],
-              ["WHIP", p.pitcherWhip ?? "-", p.pitcherWhip && p.pitcherWhip > 1.4 ? "#00e676" : T.text],
-              ["HA vs TEAM", p.hrAllowedVsTeam != null ? p.hrAllowedVsTeam + " HR" : "-", p.hrAllowedVsTeam > 2 ? "#00e676" : T.text],
-              ["OPS", p.ops ?? "-", T.text],
-              ["EV", p.exitVelo ? p.exitVelo + "mph" : "-", T.text],
-              ["PARK×", p.parkFactor ?? "-", T.text],
-            ].map(([l, v, col]) => (
-              <div key={l} style={{ fontFamily: F.mono, fontSize: 9, background: T.card, border: "1px solid " + T.border, borderRadius: 5, padding: "3px 8px" }}>
-                <span style={{ color: T.muted, marginRight: 4 }}>{l}</span>
-                <span style={{ color: col }}>{v}</span>
-              </div>
-            ))}
+
+            {/* 4 — Sim result */}
+            <div style={{ background:"rgba(0,230,118,0.06)", border:"1px solid rgba(0,230,118,0.2)", borderRadius:8, padding:"8px 12px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <span style={{ fontFamily:F.mono, fontSize:9, color:"#00e676", letterSpacing:1 }}>1,000× SIM ● REAL STATS</span>
+              <span style={{ fontFamily:F.bebas, fontSize:22, color:c, textShadow:glow }}>
+                {hrPct.toFixed(1)}%
+                <span style={{ fontFamily:F.mono, fontSize:9, color:T.muted, marginLeft:6 }}>({p.simHRs ?? "—"}/1k)</span>
+              </span>
+            </div>
+
           </div>
-
-          {/* HR bar */}
-          <div style={{ marginBottom: 8 }}>
-            <HRBar pct={hrPct} />
-          </div>
-
-          {p.bvpSummary && (
-            <div style={{ fontFamily: F.mono, fontSize: 9, color: T.accent + "cc", background: "rgba(0,229,255,0.08)", border: "1px solid rgba(0,229,255,0.3)", borderRadius: 6, padding: "5px 8px", marginBottom: 5, lineHeight: 1.5 }}>
-              📊 {p.bvpSummary}
-            </div>
-          )}
-          {p.homeAwaySplit && (
-            <div style={{ fontFamily: F.mono, fontSize: 9, color: T.green + "aa", background: "rgba(0,230,118,0.07)", border: "1px solid rgba(0,230,118,0.25)", borderRadius: 6, padding: "5px 8px", marginBottom: 5, lineHeight: 1.5 }}>
-              {p.isHome ? "🏠" : "✈"} {p.homeAwaySplit}
-            </div>
-          )}
-
-          {p.weatherInsight && (
-            <div style={{ fontFamily: F.mono, fontSize: 9, color: T.green + "cc", background: "rgba(0,230,118,0.07)", border: "1px solid rgba(0,230,118,0.25)", borderRadius: 6, padding: "5px 8px", lineHeight: 1.5 }}>
-              🌤 {p.weatherInsight}
-            </div>
-          )}
-          {/* Hot streak banner */}
         </div>
       )}
     </div>
