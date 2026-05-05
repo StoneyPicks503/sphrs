@@ -372,25 +372,87 @@ async function fetchBvP(batterId, pitcherId) {
 }
 
 /* Lookup pitcher MLBAM ID by name */
+/* Known pitcher MLBAM IDs — hardcoded for reliability */
+const PITCHER_IDS = {
+  "Shohei Ohtani":660271,"Yoshinobu Yamamoto":808967,"Walker Buehler":621111,
+  "Freddie Freeman":518692,"Max Fried":608331,"Gerrit Cole":543037,
+  "Logan Webb":657277,"Sandy Alcantara":645261,"Zack Wheeler":554430,
+  "Spencer Strider":675911,"Blake Snell":605483,"Justin Verlander":434378,
+  "Aaron Nola":605400,"Kyle Freeland":621433,"Framber Valdez":664285,
+  "Kevin Gausman":592332,"Cristopher Sanchez":663776,"Drew Rasmussen":680573,
+  "George Kirby":669923,"Logan Gilbert":669302,"Luis Castillo":622491,
+  "Jacob deGrom":594798,"Chris Bassitt":605135,"Gavin Williams":691706,
+  "Bryce Elder":669373,"Tanner Bibee":687799,"Brandon Sproat":700695,
+  "Jameson Taillon":592791,"Andrew Abbott":682218,"Chad Patrick":672576,
+  "Andre Pallante":664728,"Michael Lorenzen":573244,"Bubba Chandler":695249,
+  "Eduardo Rodriguez":628317,"Kyle Leahy":656362,"Peter Lambert":656909,
+  "Jovani Moran":672515,"Taj Bradley":694297,"Cade Cavalli":672382,
+  "Elmer Rodriguez":700228,"Jack Leiter":687282,"Tyler Holton":663399,
+  "Stephen Kolek":687330,"Luis Severino":622663,"Walker Buehler":621111,
+  "Randy Vasquez":694652,"Trevor McDonald":700720,"JR Ritchie":699561,
+  "Tanner Bibee":687799,"Michael Wacha":519151,"Nick Martinez":608566,
+  "Huascar Brazoban":685553,"Tomoyuki Sugano":693452,"Shane Baz":663158,
+  "Cam Schlittler":700987,"Aaron Nola":605400,"Janson Junk":681867,
+  "Chase Petty":694004,"Edward Cabrera":666100,"Eric Lauer":641553,
+  "Payton Tolle":694050,"Randy Vasquez":694652,"Sam Aldegheri":700567,
+  "Erick Fedde":622698,"Davis Martin":681851,"Jose Soriano":665765,
+  "Steven Okert":608710,"Yoshinobu Yamamoto":808967,"Jacob deGrom":594798,
+};
+
+
+/* Known batter MLBAM IDs — hardcoded for BvP reliability */
+const BATTER_IDS = {
+  "Aaron Judge":592450,"Shohei Ohtani":660271,"Mookie Betts":605141,
+  "Yordan Alvarez":670541,"Matt Olson":621566,"Kyle Schwarber":656941,
+  "Bryce Harper":547180,"Gunnar Henderson":683002,"Pete Alonso":624413,
+  "Juan Soto":665742,"Vladimir Guerrero Jr":665489,"Bo Bichette":666182,
+  "Jose Ramirez":608070,"Elly De La Cruz":682829,"Bobby Witt Jr":677951,
+  "Mike Trout":545361,"Nolan Arenado":571448,"Freddie Freeman":518692,
+  "Rafael Devers":646240,"Fernando Tatis Jr":665487,"Francisco Lindor":596019,
+  "James Wood":694192,"Byron Buxton":621439,"Randy Arozarena":668227,
+  "Ian Happ":664023,"Pete Crow-Armstrong":682998,"Julio Rodriguez":677594,
+  "Shea Langeliers":669127,"Willy Adames":642715,"Matt Chapman":656305,
+  "Jarren Duran":680776,"Alex Bregman":608324,"Jackson Chourio":682626,
+  "Munetaka Murakami":673548,"Nick Kurtz":695373,"Ben Rice":692467,
+  "Jazz Chisholm":665862,"Anthony Volpe":694192,"Austin Riley":663586,
+  "Ozzie Albies":645277,"Spencer Torkelson":679529,"Riley Greene":682985,
+  "Kerry Carpenter":680757,"Triston Casas":670032,"Masataka Yoshida":673548,
+  "Salvador Perez":521692,"Vinnie Pasquantino":686469,"MJ Melendez":669004,
+  "Steven Kwan":680757,"Josh Naylor":647304,"Jose Altuve":514888,
+  "Jeremy Pena":665161,"Yainer Diaz":673237,"Chas McCormick":676801,
+  "Ketel Marte":606466,"Corbin Carroll":682998,"Christian Walker":572233,
+  "Manny Machado":592518,"Jake Cronenworth":657743,"Jackson Merrill":701538,
+  "Trea Turner":607208,"Nick Castellanos":592206,"William Contreras":661388,
+  "Christian Yelich":592885,"Oneil Cruz":665833,"Bryan Reynolds":668804,
+  "Andrew McCutchen":457705,"Carlos Correa":621043,"Ryan Jeffers":680436,
+  "Nathaniel Lowe":663993,"Adolis Garcia":666969,"Wyatt Langford":694192,
+  "Ezequiel Tovar":678662,"Brenton Doyle":684597,"Ryan McMahon":641943,
+};
+
 async function fetchPitcherIds(pitcherNames) {
   const idMap = {};
-  try {
-    // Use MLB player search API
-    await Promise.all(pitcherNames.map(async name => {
-      try {
-        const encoded = encodeURIComponent(name);
-        const url = "https://statsapi.mlb.com/api/v1/people/search?names=" + encoded +
-          "&fields=people,fullName,id,primaryPosition,primaryPosition.abbreviation";
-        const r = await fetch(url);
-        const d = await r.json();
-        const match = (d.people ?? []).find(p =>
-          p.fullName?.toLowerCase() === name.toLowerCase() &&
-          ["P","SP","RP"].includes(p.primaryPosition?.abbreviation)
-        );
-        if (match) idMap[name] = match.id;
-      } catch (_) {}
-    }));
-  } catch (_) {}
+  // First use hardcoded IDs
+  pitcherNames.forEach(name => {
+    if (PITCHER_IDS[name]) idMap[name] = PITCHER_IDS[name];
+  });
+  // Then try API for any missing
+  const missing = pitcherNames.filter(n => !idMap[n]);
+  if (missing.length === 0) return idMap;
+  await Promise.all(missing.map(async name => {
+    try {
+      const encoded = encodeURIComponent(name);
+      const url = "https://statsapi.mlb.com/api/v1/people/search?names=" + encoded +
+        "&season=2026&sportId=1&fields=people,fullName,id,primaryPosition,abbreviation";
+      const r = await fetch(url);
+      const d = await r.json();
+      // Try exact match first, then partial
+      let match = (d.people ?? []).find(p => p.fullName?.toLowerCase() === name.toLowerCase());
+      if (!match) match = (d.people ?? []).find(p =>
+        p.fullName?.toLowerCase().includes(name.split(" ").slice(-1)[0].toLowerCase())
+      );
+      if (match) idMap[name] = match.id;
+    } catch (_) {}
+  }));
   return idMap;
 }
 
@@ -1524,7 +1586,7 @@ export default function App() {
             const gp       = roster?.gp ?? live?.gp ?? p.gamesPlayed ?? null;
             const ops      = roster?.ops ?? live?.ops ?? p.ops ?? null;
             const avg      = roster?.avg ?? live?.avg ?? p.avg ?? null;
-            const batterId = roster?.id  ?? live?.id  ?? p.mlbId ?? null;
+            const batterId = BATTER_IDS[p.name] ?? BATTER_IDS[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()] ?? roster?.id ?? live?.id ?? p.mlbId ?? null;
             // BvP from API cache
             // Determine which pitcher this batter faces (opposing SP from game data)
             const gameObj  = games.find(g => g.away + g.home === gameKey2);
@@ -1576,11 +1638,12 @@ export default function App() {
       Object.values(newResults).forEach(gr => {
         (gr.players ?? []).forEach(p => {
           // Get batterId from live HR map since mlbId might be null from plain text parser
-          const liveEntry = liveHRMap[p.name] ?? liveHRMap[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()];
-          const gd3 = allGameData[gr.away + gr.home];
-          const allH = [...(gd3?.awayHitters||[]), ...(gd3?.homeHitters||[])];
+          const liveEntry   = liveHRMap[p.name] ?? liveHRMap[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()];
+          const gd3         = allGameData[gr.away + gr.home];
+          const allH        = [...(gd3?.awayHitters||[]), ...(gd3?.homeHitters||[])];
           const rosterEntry = allH.find(h => h.name === p.name || h.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim() === p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim());
-          const batterId    = rosterEntry?.id ?? liveEntry?.id ?? p.mlbId;
+          // Use hardcoded BATTER_IDS first — most reliable
+          const batterId    = BATTER_IDS[p.name] ?? BATTER_IDS[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()] ?? rosterEntry?.id ?? liveEntry?.id ?? p.mlbId;
           const pitcherName = p.pitcher || "";
           const pitcherId   = pitcherIdMap[pitcherName] ?? pitcherIdMap[pitcherName.split(" ").slice(-1)[0]];
           if (batterId && pitcherId) {
