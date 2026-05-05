@@ -596,6 +596,33 @@ async function prefetchGameData(games) {
   return gameData;
 }
 
+
+/* ── Fetch pitcher arsenal (pitch mix) from MLB Stats API ── */
+async function fetchPitcherArsenal(pitcherId) {
+  if (!pitcherId) return [];
+  try {
+    const url = "https://statsapi.mlb.com/api/v1/people/" + pitcherId +
+      "/stats?stats=byPitchType&season=2026&group=pitching" +
+      "&fields=stats,splits,stat,numberOfPitches,pitchesThrown,type,description";
+    const r = await fetch(url);
+    if (!r.ok) return [];
+    const d = await r.json();
+    const splits = d.stats?.[0]?.splits ?? [];
+    return splits
+      .filter(s => s.stat?.numberOfPitches > 0)
+      .map(s => ({
+        name: s.type?.description || s.stat?.type || "Unknown",
+        pct:  Math.round((s.stat?.numberOfPitches / splits.reduce((acc, x) => acc + (x.stat?.numberOfPitches||0), 0)) * 100),
+        count: s.stat?.numberOfPitches,
+      }))
+      .filter(p => p.pct >= 3)
+      .sort((a, b) => b.pct - a.pct)
+      .slice(0, 5);
+  } catch (_) {
+    return [];
+  }
+}
+
 /* ── Live MLB Injury Report ── */
 async function fetchInjuredPlayers() {
   const injured = new Set();
@@ -635,37 +662,38 @@ async function fetchInjuredPlayers() {
 // Returns number of simulated HR out of N attempts
 function runHRSimulation(batter, pitcher, weatherBoost = 0, N = 1000) {
   const gp  = batter?.gp || 33;
-  const hr  = batter?.hr || 4;
-  const ops = parseFloat(batter?.ops || "0.750") || 0.750;
+  const hr  = batter?.hr || 3;
+  const ops = parseFloat(batter?.ops || "0.720") || 0.720;
 
-  // Real MLB HR rate per game for a batter:
-  // League avg is ~1.1 HR per team per game = ~0.037 per PA
-  // But we simulate per GAME not per PA
-  // Good HR hitter: ~0.25 HR/game (hits one every 4 games)
-  // Avg hitter:     ~0.10 HR/game (hits one every 10 games)
-  // Low HR hitter:  ~0.05 HR/game
+  // Realistic per-game HR probability benchmarks:
+  // Elite (Judge ~58HR pace): ~18-22% per game
+  // Good power (15-20 HR pace): ~10-14%
+  // Average (8-12 HR pace): ~5-8%
+  // Low power (1-4 HR pace): ~1-4%
 
-  // Base rate = HR / games played (HR per game)
-  const baseRate = Math.max(hr / Math.max(gp, 20), 0.03);
+  // Scale HR/game down to realistic probability
+  // Raw HR/game (e.g. 13/34 = 0.382) needs to be ~halved
+  const rawRate  = hr / Math.max(gp, 20);
+  const baseRate = rawRate * 0.5; // realistic calibration
 
-  // OPS boost — above .800 OPS = above avg power
-  const opsBoost = Math.max(0, (ops - 0.700) * 0.15);
+  // OPS adds a small boost for elite hitters
+  const opsBoost = Math.max(0, (ops - 0.750) * 0.08);
 
-  // Pitcher ERA adjustment — scale around league avg ERA of 4.20
+  // Pitcher ERA vs league avg 4.20
   const era = parseFloat(pitcher?.era || "4.20") || 4.20;
-  const pitcherMult = Math.max(0.6, Math.min(1.6, era / 4.20));
+  const pitcherMult = Math.max(0.7, Math.min(1.45, era / 4.20));
 
-  // Weather: fieldBoost is -1 (blowing in) to +1 (blowing out)
-  const weatherMult = 1 + (Math.max(-1, Math.min(1, weatherBoost)) * 0.12);
+  // Weather: -1 = blowing in (suppresses), +1 = blowing out (boosts)
+  const weatherMult = 1 + (Math.max(-1, Math.min(1, weatherBoost)) * 0.10);
 
-  // Final probability per simulated game
-  const hrProb = Math.min(0.45, (baseRate + opsBoost) * pitcherMult * weatherMult);
+  // Final probability — cap at 30% (even elite spots rarely exceed this)
+  const hrProb = Math.min(0.30, (baseRate + opsBoost) * pitcherMult * weatherMult);
 
   let hits = 0;
   for (let i = 0; i < N; i++) {
     if (Math.random() < hrProb) hits++;
   }
-  return hits; // out of N (e.g. 185 out of 1000 = 18.5%)
+  return hits;
 }
 
 /* ── JSON helpers ── */
@@ -857,17 +885,40 @@ function PlayerRow({ p, rank, delay = 0 }) {
               </span>
             </div>
 
-            {/* 2 — BvP */}
-            <div style={{ background:"rgba(255,202,40,0.07)", border:"1px solid rgba(255,202,40,0.25)", borderRadius:8, padding:"8px 12px", display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:4 }}>
-              <span style={{ fontFamily:F.mono, fontSize:9, color:T.amber, letterSpacing:1 }}>
-                vs {(p.pitcher||"Pitcher")} {p.pitcherHand ? "("+p.pitcherHand+")" : ""} ERA {p.pitcherERA ?? "N/A"}
-                <span style={{ color:"#00e676", fontSize:7, marginLeft:5 }}>● LIVE BvP</span>
-              </span>
-              <span style={{ fontFamily:F.mono, fontSize:11, color:T.text }}>
-                {(p.bvpAB != null && p.bvpAB > 0)
-                  ? <>{p.bvpAB} AB · <span style={{ color:T.amber }}>{p.bvpAVG || ".000"} AVG</span> · <span style={{ color:"#00e676", fontWeight:700 }}>{p.bvpHR ?? 0} HR</span></>
-                  : <span style={{ color:T.muted }}>First career matchup</span>}
-              </span>
+            {/* 2 — BvP vs today's pitcher */}
+            <div style={{ background:"rgba(255,202,40,0.07)", border:"1px solid rgba(255,202,40,0.25)", borderRadius:8, padding:"8px 12px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: (p.bvpAB > 0 || p.pitcherArsenal?.length > 0) ? 8 : 0 }}>
+                <span style={{ fontFamily:F.mono, fontSize:9, color:T.amber, letterSpacing:1 }}>
+                  vs {(p.pitcher||"Pitcher")} {p.pitcherHand ? "("+p.pitcherHand+")" : ""} ERA {p.pitcherERA ?? "N/A"}
+                  <span style={{ color:"#00e676", fontSize:7, marginLeft:5 }}>● LIVE</span>
+                </span>
+                <span style={{ fontFamily:F.mono, fontSize:11, color:T.text }}>
+                  {(p.bvpAB != null && p.bvpAB > 0)
+                    ? <><span style={{ color:T.amber, fontWeight:700 }}>{p.bvpAVG || ".000"}</span> AVG · <span style={{ color:"#00e676" }}>{p.bvpHR ?? 0} HR</span> · {p.bvpAB} AB</>
+                    : <span style={{ color:T.muted }}>First career matchup</span>}
+                </span>
+              </div>
+
+              {/* Pitch mix */}
+              {p.pitcherArsenal?.length > 0 && (
+                <div>
+                  <div style={{ fontFamily:F.mono, fontSize:8, color:T.muted, letterSpacing:1, marginBottom:5 }}>PITCH MIX</div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+                    {p.pitcherArsenal.map((pitch, i) => (
+                      <div key={i} style={{ display:"flex", alignItems:"center", gap:8 }}>
+                        <div style={{ fontFamily:F.mono, fontSize:9, color:T.text, width:110, flexShrink:0 }}>{pitch.name}</div>
+                        <div style={{ flex:1, background:"rgba(255,255,255,0.06)", borderRadius:3, height:5, overflow:"hidden" }}>
+                          <div style={{
+                            width: pitch.pct + "%", height:"100%", borderRadius:3,
+                            background: i === 0 ? T.accent : i === 1 ? T.amber : i === 2 ? T.purple : T.muted,
+                          }} />
+                        </div>
+                        <div style={{ fontFamily:F.mono, fontSize:9, color:T.muted, width:28, textAlign:"right", flexShrink:0 }}>{pitch.pct}%</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* 3 — Weather */}
@@ -1651,14 +1702,19 @@ export default function App() {
           if (batterId && pitcherId) {
             const cacheKey = batterId + "_" + pitcherName;
             bvpFetches.push(
-              fetchBvP(batterId, pitcherId).then(bvp => {
+              Promise.all([
+                fetchBvP(batterId, pitcherId),
+                fetchPitcherArsenal(pitcherId),
+              ]).then(([bvp, arsenal]) => {
                 if (bvp) {
                   bvpCache[cacheKey] = bvp;
-                  // Update the player in place
                   p.bvpSummary = (bvp.ab || 0) + " AB · " + (bvp.avg || ".000") + " AVG · " + (bvp.hr || 0) + " HR";
                   p.bvpHR  = bvp.hr;
                   p.bvpAB  = bvp.ab;
                   p.bvpAVG = bvp.avg;
+                }
+                if (arsenal && arsenal.length > 0) {
+                  p.pitcherArsenal = arsenal;
                 }
               })
             );
