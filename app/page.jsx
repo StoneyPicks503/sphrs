@@ -1086,6 +1086,9 @@ function buildPrompt(games, weatherMap = {}, gameData = {}) {
     "Alex Bregman=608324, Jackson Chourio=682626, Munetaka Murakami=673548, Nick Kurtz=695373",
     "",
     "CRITICAL JSON RULES: Use ONLY double-quotes. Start with { end with }. No other text.",
+    "Return ONLY the fields listed. Do NOT add weatherSummary, summary, notes, or any extra fields.",
+    "Keep values SHORT — bvpSummary max 10 words, weatherInsight max 12 words.",
+    "Return EXACTLY 5 players per game, no more, no less.",
     "",
     '{"games":[{"away":"BAL","home":"NYY","venue":"Yankee Stadium","time":"1:35 PM ET",',
     '"players":[{"name":"Aaron Judge","team":"NYY","mlbId":592450,"emoji":"⚡","teamColor":"#003087",',
@@ -1126,14 +1129,16 @@ export default function App() {
     { match:"players on IL",            pct:46, label:"Injury report loaded ✅" },
     { match:"Analyzing BvP",            pct:50, label:"Analyzing BvP matchups..." },
     { match:"Monte Carlo",              pct:55, label:"Running 10,000× simulations..." },
-    { match:"Analyzing batch 1",        pct:58, label:"Claude analyzing batch 1 of 4..." },
+    { match:"Analyzing batch 1",        pct:58, label:"Claude analyzing batch 1 of 5..." },
     { match:"Batch 1 done",             pct:64, label:"Batch 1 complete ✅" },
-    { match:"Analyzing batch 2",        pct:66, label:"Claude analyzing batch 2 of 4..." },
+    { match:"Analyzing batch 2",        pct:66, label:"Claude analyzing batch 2 of 5..." },
     { match:"Batch 2 done",             pct:72, label:"Batch 2 complete ✅" },
-    { match:"Analyzing batch 3",        pct:74, label:"Claude analyzing batch 3 of 4..." },
+    { match:"Analyzing batch 3",        pct:74, label:"Claude analyzing batch 3 of 5..." },
     { match:"Batch 3 done",             pct:80, label:"Batch 3 complete ✅" },
-    { match:"Analyzing batch 4",        pct:82, label:"Claude analyzing batch 4 of 4..." },
-    { match:"Batch 4 done",             pct:86, label:"Batch 4 complete ✅" },
+    { match:"Analyzing batch 4",        pct:80, label:"Claude analyzing batch 4 of 5..." },
+    { match:"Batch 4 done",             pct:84, label:"Batch 4 complete ✅" },
+    { match:"Analyzing batch 5",        pct:86, label:"Claude analyzing batch 5 of 5..." },
+    { match:"Batch 5 done",             pct:89, label:"Batch 5 complete ✅" },
     { match:"Verifying positions",      pct:86, label:"Verifying rosters & positions..." },
     { match:"All players verified",     pct:90, label:"All players verified ✅" },
     { match:"Fetching live BvP",        pct:92, label:"Fetching official BvP stats..." },
@@ -1226,7 +1231,7 @@ export default function App() {
       const allGameData = {};
 
       // Split into batches of 4 to avoid token limit
-      const BATCH = 4; // Smaller batches prevent JSON truncation
+      const BATCH = 3; // 3 games per batch prevents truncation
       const allGameResults = [];
       const batches = [];
       for (let i = 0; i < games.length; i += BATCH) {
