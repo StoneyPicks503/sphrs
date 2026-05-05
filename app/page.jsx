@@ -797,11 +797,15 @@ function PlayerRow({ p, rank, delay = 0 }) {
             </div>
             {/* BvP vs today's pitcher — live from MLB API */}
             <div style={{ width:"100%", background:"rgba(255,202,40,0.07)", border:"1px solid rgba(255,202,40,0.3)", borderRadius:7, padding:"5px 10px", marginBottom:4, display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:4 }}>
-              <span style={{ fontFamily:F.mono, fontSize:9, color:T.amber }}>vs {p.pitcher} <span style={{ color:"#00e676", fontSize:7 }}>● LIVE BvP</span></span>
+              <span style={{ fontFamily:F.mono, fontSize:9, color:T.amber }}>
+                vs {p.pitcher || "today's pitcher"} <span style={{ color:"#00e676", fontSize:7 }}>● LIVE BvP</span>
+              </span>
               <span style={{ fontFamily:F.mono, fontSize:10, color:T.text }}>
-                {p.bvpAB != null
-                  ? <>{p.bvpAB} AB · <span style={{ color:T.amber }}>{p.bvpAVG} AVG</span> · <span style={{ color:"#00e676" }}>{p.bvpHR} HR</span></>
-                  : (p.bvpSummary || "No career data")
+                {(p.bvpAB != null && p.bvpAB > 0)
+                  ? <>{p.bvpAB} AB · <span style={{ color:T.amber }}>{p.bvpAVG || ".000"} AVG</span> · <span style={{ color:"#00e676" }}>{p.bvpHR ?? 0} HR</span></>
+                  : p.bvpSummary && p.bvpSummary !== "No BvP data"
+                    ? p.bvpSummary
+                    : <span style={{ color:T.muted }}>First career matchup</span>
                 }
               </span>
             </div>
@@ -1516,7 +1520,12 @@ export default function App() {
             const avg      = roster?.avg ?? live?.avg ?? p.avg ?? null;
             const batterId = roster?.id  ?? live?.id  ?? p.mlbId ?? null;
             // BvP from API cache
-            const bvpKey   = (batterId || p.name) + "_" + p.pitcher;
+            // Determine which pitcher this batter faces (opposing SP from game data)
+            const gameObj  = games.find(g => g.away + g.home === gameKey2);
+            const pitcherName = p.isHome
+              ? (gameObj?.awayP || p.pitcher || "")
+              : (gameObj?.homeP || p.pitcher || "");
+            const bvpKey   = batterId + "_" + pitcherName;
             const bvp      = bvpCache[bvpKey];
             const bvpStr   = bvp
               ? bvp.ab + " AB · " + bvp.avg + " AVG · " + bvp.hr + " HR"
@@ -1539,6 +1548,7 @@ export default function App() {
               gamesPlayed:  gp,
               ops,
               avg,
+              pitcher:      pitcherName,
               bvpSummary:   bvpStr,
               bvpHR:        bvp?.hr ?? null,
               bvpAB:        bvp?.ab ?? null,
@@ -1559,9 +1569,14 @@ export default function App() {
       const bvpFetches = [];
       Object.values(newResults).forEach(gr => {
         (gr.players ?? []).forEach(p => {
-          const batterId  = p.mlbId;
-          const pitcherName = p.pitcher;
-          const pitcherId = pitcherIdMap[pitcherName];
+          // Get batterId from live HR map since mlbId might be null from plain text parser
+          const liveEntry = liveHRMap[p.name] ?? liveHRMap[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()];
+          const gd3 = allGameData[gr.away + gr.home];
+          const allH = [...(gd3?.awayHitters||[]), ...(gd3?.homeHitters||[])];
+          const rosterEntry = allH.find(h => h.name === p.name || h.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim() === p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim());
+          const batterId    = rosterEntry?.id ?? liveEntry?.id ?? p.mlbId;
+          const pitcherName = p.pitcher || "";
+          const pitcherId   = pitcherIdMap[pitcherName] ?? pitcherIdMap[pitcherName.split(" ").slice(-1)[0]];
           if (batterId && pitcherId) {
             const cacheKey = batterId + "_" + pitcherName;
             bvpFetches.push(
@@ -1569,7 +1584,7 @@ export default function App() {
                 if (bvp) {
                   bvpCache[cacheKey] = bvp;
                   // Update the player in place
-                  p.bvpSummary = bvp.ab + " AB · " + bvp.avg + " AVG · " + bvp.hr + " HR · " + bvp.so + " K";
+                  p.bvpSummary = (bvp.ab || 0) + " AB · " + (bvp.avg || ".000") + " AVG · " + (bvp.hr || 0) + " HR";
                   p.bvpHR  = bvp.hr;
                   p.bvpAB  = bvp.ab;
                   p.bvpAVG = bvp.avg;
