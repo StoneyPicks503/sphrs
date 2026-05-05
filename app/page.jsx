@@ -567,6 +567,48 @@ async function fetchInjuredPlayers() {
   return injured;
 }
 
+
+/* ── Real Monte Carlo HR Simulation ── */
+// Runs N simulations of a batter vs pitcher using real fetched stats
+// Returns number of simulated HR out of N attempts
+function runHRSimulation(batter, pitcher, weatherBoost = 0, N = 1000) {
+  // Base HR rate from batter stats
+  const ops     = parseFloat(batter?.ops  || "0.700") || 0.700;
+  const avg     = parseFloat(batter?.avg  || "0.250") || 0.250;
+  const slg     = parseFloat(batter?.slg  || "0.400") || 0.400;
+  const gp      = batter?.gp || 30;
+  const hr      = batter?.hr || 3;
+
+  // Estimate HR rate per PA from real stats
+  // Approx PA = games * 4, HR/PA = known rate
+  const paEstimate  = Math.max(gp * 3.8, 50);
+  const baseHRRate  = hr / paEstimate; // e.g. 13HR/120PA = 0.108
+
+  // Pitcher adjustment — ERA reflects run prevention, HR/9 would be ideal
+  // We approximate: high ERA pitcher = more HRs allowed
+  const pitcherERA  = parseFloat(pitcher?.era || "4.00") || 4.00;
+  const pitcherAdj  = pitcherERA / 4.00; // 1.0 = league avg, >1 = HR-friendly
+
+  // Park factor adjustment
+  const parkFactor  = parseFloat(batter?.parkFactor || "1.00") || 1.00;
+
+  // Weather boost from wind analysis (-0.15 to +0.15)
+  const weatherAdj  = Math.max(-0.15, Math.min(0.15, weatherBoost));
+
+  // Final HR probability per PA
+  const hrProb = Math.min(
+    baseHRRate * pitcherAdj * parkFactor * (1 + weatherAdj),
+    0.35 // cap at 35%
+  );
+
+  // Run N simulations
+  let hits = 0;
+  for (let i = 0; i < N; i++) {
+    if (Math.random() < hrProb) hits++;
+  }
+  return hits; // out of N
+}
+
 /* ── JSON helpers ── */
 function sanitize(s) {
   s = s.replace(/[\u201c\u201d]/g, '"').replace(/[\u2018\u2019]/g, "'");
@@ -725,15 +767,20 @@ function PlayerRow({ p, rank, delay = 0 }) {
           </div>
         </div>
 
-        {/* HR % + sim count */}
+        {/* HR % + sim count + AI score */}
         <div style={{ textAlign: "right", flexShrink: 0 }}>
           <div style={{ fontFamily: F.bebas, fontSize: 26, color: c, lineHeight: 1, textShadow: glow }}>
             {hrPct.toFixed(1)}%
           </div>
           <div style={{ fontFamily: F.mono, fontSize: 8, color: T.muted, marginBottom: 2 }}>HR CHANCE</div>
           {p.simHRs != null && (
-            <div style={{ fontFamily: F.mono, fontSize: 8, color: c, background: c + "15", border: "1px solid " + c + "30", borderRadius: 4, padding: "1px 5px", textAlign: "center" }}>
-              {p.simHRs.toLocaleString()}<span style={{ color: T.muted }}>/10k</span>
+            <div style={{ fontFamily: F.mono, fontSize: 8, color: c, background: c + "15", border: "1px solid " + c + "30", borderRadius: 4, padding: "1px 5px", textAlign: "center", marginBottom: 2 }}>
+              {p.simHRs.toLocaleString()}<span style={{ color: T.muted }}>/1k</span>
+            </div>
+          )}
+          {p.aiScore != null && (
+            <div style={{ fontFamily: F.mono, fontSize: 8, color: T.purple, background: T.purple + "15", border: "1px solid " + T.purple + "30", borderRadius: 4, padding: "1px 5px", textAlign: "center" }}>
+              AI <span style={{ fontWeight: 700 }}>{p.aiScore}</span>
             </div>
           )}
         </div>
@@ -767,7 +814,7 @@ function PlayerRow({ p, rank, delay = 0 }) {
             {/* Sim result banner */}
             {p.simHRs != null && (
               <div style={{ width: "100%", background: "rgba(0,230,118,0.08)", border: "1px solid rgba(0,230,118,0.3)", borderRadius: 7, padding: "5px 10px", marginBottom: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontFamily: F.mono, fontSize: 9, color: T.muted }}>10,000 SIM RESULT</span>
+                <span style={{ fontFamily: F.mono, fontSize: 9, color: T.muted }}>1,000 SIM RESULT</span>
                 <span style={{ fontFamily: F.arch, fontSize: 13, color: "#00e676" }}>
                   {p.simHRs.toLocaleString()} HR hits
                   <span style={{ fontFamily: F.mono, fontSize: 9, color: T.muted, marginLeft: 6 }}>vs {p.pitcher}</span>
@@ -1070,7 +1117,7 @@ function buildPrompt(games, weatherMap = {}, gameData = {}) {
     "- bvpSummary (1 sentence with career stats vs this pitcher), homeAwaySplit (1 line)",
     "- weatherInsight: cite REAL weather — temp F, wind mph, direction vs field, HR impact",
     "- seasonHRs (use exact number from list above), gamesPlayed, ops, parkFactor",
-    "- simHRs: HR hits out of 10000 simulations vs this specific pitcher today (integer)",
+    "- simHRs: HR hits out of 1000 simulations vs this specific pitcher today (integer 0-350 range),",
     "- hotStreak: HR count in last 10 games (integer, 0 if none)",
     "- hotStreakNote: 1 sentence on recent HR form",
     "- confidence: 0-100, boost up to 10pts for hot streak",
@@ -1131,7 +1178,7 @@ export default function App() {
     { match:"Checking MLB injury",      pct:42, label:"Checking injury report..." },
     { match:"players on IL",            pct:46, label:"Injury report loaded ✅" },
     { match:"Analyzing BvP",            pct:50, label:"Analyzing BvP matchups..." },
-    { match:"Monte Carlo",              pct:55, label:"Running 10,000× simulations..." },
+    { match:"Monte Carlo",              pct:55, label:"Running 1,000× simulations..." },
     { match:"Analyzing batch",          pct:60, label:"Claude analyzing games..." },
     { match:"Batch",                    pct:82, label:"Batch complete ✅" },
     { match:"Verifying positions",      pct:86, label:"Verifying rosters & positions..." },
@@ -1219,7 +1266,7 @@ export default function App() {
       await new Promise(r => setTimeout(r, 150));
       setStep("📊 Analyzing BvP + HR chance % per player...");
       await new Promise(r => setTimeout(r, 150));
-      setStep("🎲 Running 10,000-game Monte Carlo...");
+      setStep("🎲 Running 1,000-game Monte Carlo...");
       await new Promise(r => setTimeout(r, 150));
 
       // Consolidated game data from all batches
@@ -1512,7 +1559,21 @@ export default function App() {
             const bvpStr = bvp
               ? bvp.ab + " AB · " + bvp.avg + " AVG · " + bvp.hr + " HR"
               : (p.bvpSummary || "No BvP data");
-            const validSims = (p.simHRs != null && p.simHRs >= 0 && p.simHRs <= 5000) ? p.simHRs : null;
+
+            // ── Real Monte Carlo simulation using actual fetched stats ──
+            const pitcherForSim = p.isHome ? allGameData[gameKey2]?.awayPitcher : allGameData[gameKey2]?.homePitcher;
+            const weatherForSim = weatherMap[gameKey2];
+            const weatherBoost  = weatherForSim?.fieldBoost ?? 0;
+            const simBatter = rosterData || liveData || { hr: correctedHR || 3, gp: correctedGP || 30, ops: correctedOPS || "0.700", avg: ".250" };
+            const realSimCount  = runHRSimulation(simBatter, pitcherForSim, weatherBoost, 1000);
+            const realSimScaled = realSimCount; // raw /1000
+
+            // AI confidence score from Claude (0-100)
+            const aiConfidence = p.confidence ?? Math.round((p.hrChancePct ?? 0) * 3);
+
+            // Use real sim when we have roster data, else Claude's estimate
+            const validSims = rosterData ? realSimScaled
+              : (p.simHRs != null && p.simHRs >= 0 && p.simHRs <= 5000 ? p.simHRs : realSimScaled);
             return {
               ...p,
               team:        p.isHome ? teams.home : teams.away,
@@ -1525,6 +1586,8 @@ export default function App() {
               bvpAB:       bvp?.ab ?? null,
               bvpAVG:      bvp?.avg ?? null,
               simHRs:      validSims,
+              realSim:     realSimCount,   // raw /1000 sim count
+              aiScore:     aiConfidence,   // Claude's AI confidence 0-100
               hotStreak:   isHot,
               hotNote:     hotStreakMap[p.name] || "",
               hrChancePct: isHot ? Math.min(35, (p.hrChancePct ?? 0) + 2.5) : (p.hrChancePct ?? 0),
@@ -1601,7 +1664,7 @@ export default function App() {
           ⚾ SPHRS
         </div>
         <div style={{ fontFamily:F.mono, fontSize:10, color:"#8ab4d4", marginTop:3 }}>
-          WEATHER CHECK · DAY/NIGHT BA · BvP AVERAGE · 10,000× MONTE CARLO
+          WEATHER CHECK · DAY/NIGHT BA · BvP AVERAGE · 1,000× MONTE CARLO
         </div>
       </div>
 
@@ -1729,7 +1792,7 @@ export default function App() {
         )}
 
         <div style={{ textAlign:"center", fontFamily:F.mono, fontSize:9, color:"#2a4060", marginTop:8 }}>
-          Claude AI · Weather Check · Day/Night BA · BvP Average · Park Factor · 10,000× Monte Carlo
+          Claude AI · Weather Check · Day/Night BA · BvP Average · Park Factor · 1,000× Monte Carlo
         </div>
       </div>
     </div>
