@@ -881,7 +881,7 @@ function PlayerRow({ p, rank, delay = 0 }) {
               </div>
             )}
             {[
-              ["vs", p.pitcher + " (" + p.pitcherHand + ") ERA " + (p.pitcherERA ?? "N/A"), T.amber],
+              ["vs", (p.pitcher||"Pitcher") + (p.pitcherHand ? " (" + p.pitcherHand + ")" : "") + " ERA " + (p.pitcherERA ?? "N/A"), T.amber],
               ["WHIP", p.pitcherWhip ?? "-", p.pitcherWhip && p.pitcherWhip > 1.4 ? "#00e676" : T.text],
               ["HA vs TEAM", p.hrAllowedVsTeam != null ? p.hrAllowedVsTeam + " HR" : "-", p.hrAllowedVsTeam > 2 ? "#00e676" : T.text],
               ["OPS", p.ops ?? "-", T.text],
@@ -1239,6 +1239,13 @@ export default function App() {
 
       // Consolidated game data from all batches
       const allGameData = {};
+
+      // Quick lookup: pitcher name → { hand, era, rec } from ALL_GAMES
+      const pitcherDetailMap = {};
+      games.forEach(g => {
+        if (g.awayP && g.awayP !== "TBD") pitcherDetailMap[g.awayP] = { hand: g.awayH, era: g.awayERA, rec: g.awayRec };
+        if (g.homeP && g.homeP !== "TBD") pitcherDetailMap[g.homeP] = { hand: g.homeH, era: g.homeERA, rec: g.homeRec };
+      });
 
       // Split into batches of 4 to avoid token limit
       const BATCH = 2; // 2 games per batch — prevents all truncation
@@ -1649,6 +1656,14 @@ export default function App() {
       const bvpFetches = [];
       Object.values(newResults).forEach(gr => {
         (gr.players ?? []).forEach(p => {
+          // Stamp pitcher details from ALL_GAMES lookup if not already set
+          if (p.pitcher && (!p.pitcherHand || p.pitcherHand === "undefined")) {
+            const det = pitcherDetailMap[p.pitcher];
+            if (det) {
+              p.pitcherHand = det.hand || "";
+              if (p.pitcherERA == null) p.pitcherERA = det.era;
+            }
+          }
           // Get batterId from live HR map since mlbId might be null from plain text parser
           const liveEntry   = liveHRMap[p.name] ?? liveHRMap[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()];
           const gd3         = allGameData[gr.away + gr.home];
@@ -1732,6 +1747,9 @@ export default function App() {
               ops:           h.ops ?? ".800",
               avg:           h.avg ?? ".260",
               pitcher:       pitcherName,
+              pitcherHand:   pitcherDetailMap[pitcherName]?.hand || "",
+              pitcherERA:    pitcherDetailMap[pitcherName]?.era ?? null,
+              pitcherWhip:   null,
               hrChancePct:   Math.min(22, Math.max(4, (h.hr ?? 2) * 0.55)),
               confidence:    62,
               simHRs:        Math.min(Math.round(simCount), 1000),
