@@ -383,6 +383,146 @@ async function fetchPitcherIds(pitcherNames) {
   return idMap;
 }
 
+
+/* ── Team ID map for MLB Stats API ── */
+const TEAM_IDS = {
+  AZ:108, ATL:144, BAL:110, BOS:111, CHC:112, CIN:113, CLE:114,
+  COL:115, DET:116, HOU:117, KC:118, LAA:108, LAD:119, MIA:146,
+  MIL:158, MIN:142, NYM:121, NYY:147, ATH:133, PHI:143, PIT:134,
+  SD:135, SF:137, SEA:136, STL:138, TB:139, TEX:140, TOR:141, WSH:120,
+  CWS:145, LAA:108,
+};
+
+/* Fetch active roster + 2026 hitting stats for a team */
+async function fetchTeamHitters(teamAbbr) {
+  const teamId = TEAM_IDS[teamAbbr];
+  if (!teamId) return [];
+  try {
+    // Get active roster
+    const rosterUrl = "https://statsapi.mlb.com/api/v1/teams/" + teamId +
+      "/roster?rosterType=active&season=2026&fields=roster,person,fullName,id,primaryPosition,abbreviation";
+    const rr = await fetch(rosterUrl);
+    if (!rr.ok) return [];
+    const rd = await rr.json();
+
+    // Filter to position players only (not P)
+    const posPlayers = (rd.roster ?? []).filter(p =>
+      p.primaryPosition?.abbreviation !== "P" &&
+      p.primaryPosition?.abbreviation !== "TWP"
+    );
+
+    // Fetch season stats for each in parallel (limit to 13 players)
+    const results = await Promise.all(posPlayers.slice(0, 13).map(async p => {
+      try {
+        const statsUrl = "https://statsapi.mlb.com/api/v1/people/" + p.person.id +
+          "/stats?stats=season&season=2026&group=hitting" +
+          "&fields=stats,splits,stat,homeRuns,gamesPlayed,avg,ops,sluggingPct,atBats,strikeOuts";
+        const sr = await fetch(statsUrl);
+        const sd = await sr.json();
+        const stat = sd.stats?.[0]?.splits?.[0]?.stat ?? {};
+        return {
+          name:  p.person.fullName,
+          id:    p.person.id,
+          team:  teamAbbr,
+          pos:   p.primaryPosition?.abbreviation ?? "?",
+          hr:    stat.homeRuns   ?? 0,
+          gp:    stat.gamesPlayed ?? 0,
+          avg:   stat.avg        ?? ".000",
+          ops:   stat.ops        ?? ".000",
+          slg:   stat.sluggingPct ?? ".000",
+          ab:    stat.atBats     ?? 0,
+          so:    stat.strikeOuts ?? 0,
+        };
+      } catch (_) {
+        return { name: p.person.fullName, id: p.person.id, team: teamAbbr, hr: 0, gp: 0, avg: ".000", ops: ".000" };
+      }
+    }));
+    return results.filter(p => p.name);
+  } catch (_) {
+    return [];
+  }
+}
+
+/* Fetch pitcher ID and 2026 stats by name */
+async function fetchPitcherData(name) {
+  if (!name || name === "TBD") return null;
+  try {
+    const encoded = encodeURIComponent(name);
+    const url = "https://statsapi.mlb.com/api/v1/people/search?names=" + encoded +
+      "&season=2026&fields=people,fullName,id,primaryPosition,abbreviation";
+    const r = await fetch(url);
+    const d = await r.json();
+    const match = (d.people ?? []).find(p =>
+      p.fullName?.toLowerCase().includes(name.toLowerCase().split(" ").slice(-1)[0]) &&
+      p.primaryPosition?.abbreviation === "P"
+    );
+    if (!match) return null;
+
+    // Get their 2026 pitching stats
+    const statsUrl = "https://statsapi.mlb.com/api/v1/people/" + match.id +
+      "/stats?stats=season&season=2026&group=pitching" +
+      "&fields=stats,splits,stat,era,whip,homeRunsPer9,strikeOutsPer9,inningsPitched";
+    const sr = await fetch(statsUrl);
+    const sd = await sr.json();
+    const stat = sd.stats?.[0]?.splits?.[0]?.stat ?? {};
+    return {
+      id:   match.id,
+      name: match.fullName,
+      era:  stat.era   ?? null,
+      whip: stat.whip  ?? null,
+      hr9:  stat.homeRunsPer9 ?? null,
+      ip:   stat.inningsPitched ?? "0",
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+/* Fetch BvP for multiple batters vs one pitcher in parallel */
+async function fetchBvPBatch(batters, pitcherId) {
+  if (!pitcherId) return {};
+  const results = {};
+  await Promise.all(batters.map(async b => {
+    if (!b.id) return;
+    const bvp = await fetchBvP(b.id, pitcherId);
+    if (bvp) results[b.name] = bvp;
+  }));
+  return results;
+}
+
+/* Master pre-fetch — gets all real data for a batch of games */
+async function prefetchGameData(games) {
+  const gameData = {};
+  await Promise.all(games.map(async g => {
+    const key = g.away + g.home;
+    try {
+      // Fetch rosters + stats for both teams in parallel
+      const [awayHitters, homeHitters, awayPitcher, homePitcher] = await Promise.all([
+        fetchTeamHitters(g.away),
+        fetchTeamHitters(g.home),
+        fetchPitcherData(g.awayP),
+        fetchPitcherData(g.homeP),
+      ]);
+
+      // Fetch BvP for all hitters vs opposing pitcher
+      const [awayBvP, homeBvP] = await Promise.all([
+        fetchBvPBatch(awayHitters, homePitcher?.id),
+        fetchBvPBatch(homeHitters, awayPitcher?.id),
+      ]);
+
+      gameData[key] = {
+        away: g.away, home: g.home,
+        awayHitters, homeHitters,
+        awayPitcher, homePitcher,
+        awayBvP, homeBvP,
+      };
+    } catch (_) {
+      gameData[key] = null;
+    }
+  }));
+  return gameData;
+}
+
 /* ── Live MLB Injury Report ── */
 async function fetchInjuredPlayers() {
   const injured = new Set();
@@ -827,7 +967,7 @@ function RateLimitScreen({ error, onDismiss }) {
 }
 
 /* ── Prompt builder ── */
-function buildPrompt(games, weatherMap = {}) {
+function buildPrompt(games, weatherMap = {}, gameData = {}) {
   const eraStr = e => e === null || e === undefined ? "N/A" : String(e);
   const lines = games.map(g =>
     g.away + "@" + g.home + " | " + g.venue + " | " + g.city + " " + g.st + " | " + g.time +
@@ -848,8 +988,25 @@ function buildPrompt(games, weatherMap = {}) {
     "Fernando Tatis Jr=SD, Munetaka Murakami=CWS, Vladimir Guerrero Jr=TOR,",
     "Francisco Lindor=NYM, Ian Happ=CHC, Pete Crow-Armstrong=CHC, Matt Chapman=SF",
     "",
-    "TODAY'S GAMES (with REAL live weather data fetched from weather API):",
+    "TODAY'S GAMES — ALL STATS BELOW ARE REAL DATA FROM MLB STATS API:",
     lines,
+    "",
+    "REAL BATTER STATS (from MLB API — use these exact numbers):",
+    ...games.map(g => {
+      const key = g.away + g.home;
+      const gd  = gameData[key];
+      if (!gd) return g.away + "@" + g.home + ": stats unavailable";
+      const fmtHitters = (hitters, bvpMap, oppPitcher) =>
+        (hitters || []).slice(0, 8).map(h =>
+          h.name + " " + h.pos + " " + h.hr + "HR " + h.avg + "AVG " + h.ops + "OPS" +
+          (bvpMap[h.name] ? " | BvP vs " + oppPitcher + ": " + bvpMap[h.name].ab + "AB " + bvpMap[h.name].avg + "AVG " + bvpMap[h.name].hr + "HR" : "")
+        ).join(" / ");
+      const awayStr = fmtHitters(gd.awayHitters, gd.awayBvP || {}, g.homeP);
+      const homeStr = fmtHitters(gd.homeHitters, gd.homeBvP || {}, g.awayP);
+      const awayP = gd.awayPitcher ? g.awayP + " ERA " + (gd.awayPitcher.era || g.awayERA || "N/A") + " WHIP " + (gd.awayPitcher.whip || "N/A") : g.awayP + " ERA " + (g.awayERA || "N/A");
+      const homeP = gd.homePitcher ? g.homeP + " ERA " + (gd.homePitcher.era || g.homeERA || "N/A") + " WHIP " + (gd.homePitcher.whip || "N/A") : g.homeP + " ERA " + (g.homeERA || "N/A");
+      return g.away + "@" + g.home + ":\n  AWAY pitcher: " + awayP + "\n  HOME pitcher: " + homeP + "\n  " + g.away + " batters: " + awayStr + "\n  " + g.home + " batters: " + homeStr;
+    }),
     "",
     "REAL WEATHER PER GAME (include in weatherInsight):",
     ...games.map(g => {
@@ -1051,7 +1208,10 @@ export default function App() {
       setStep("🎲 Running 10,000-game Monte Carlo...");
       await new Promise(r => setTimeout(r, 150));
 
-      // Split into batches of 6 to avoid token limit
+      // Consolidated game data from all batches
+      const allGameData = {};
+
+      // Split into batches of 4 to avoid token limit
       const BATCH = 4; // Smaller batches prevent JSON truncation
       const allGameResults = [];
       const batches = [];
@@ -1066,8 +1226,16 @@ export default function App() {
       })));
 
       for (let b = 0; b < batches.length; b++) {
+        setStep("📡 Pre-fetching real stats for batch " + (b + 1) + " of " + batches.length + "...");
+        const batchGameData = await prefetchGameData(batches[b]);
+        const dataCount = Object.values(batchGameData).filter(Boolean).length;
+        setStep("✅ Real data loaded — " + dataCount + "/" + batches[b].length + " games have live stats");
+
         setStep("🤖 Analyzing batch " + (b + 1) + " of " + batches.length + " (" + batches[b].length + " games)...");
-        const raw    = await callClaude(buildPrompt(batches[b], weatherMap), 8192);
+        // Store batch game data for post-processing
+        Object.assign(allGameData, batchGameData);
+
+        const raw    = await callClaude(buildPrompt(batches[b], weatherMap, batchGameData), 8192);
         const parsed = grabJSON(raw);
         const batchResults = parsed.games ?? [];
         allGameResults.push(...batchResults);
@@ -1321,15 +1489,25 @@ export default function App() {
           .map(p => {
             const isHot = !!hotStreakMap[p.name];
 
-            // Live HR stats — tier 1 live API, tier 2 hardcoded, tier 3 Claude
+            // Tier 1: pre-fetched roster data (most accurate — from MLB API roster)
+            // Tier 2: league-wide HR leaderboard from MLB API
+            // Tier 3: hardcoded verified fallback
+            // Tier 4: Claude's estimate
+            const gameKey2 = gr.away + gr.home;
+            const gd2 = allGameData[gameKey2];
+            const allHitters = [...(gd2?.awayHitters || []), ...(gd2?.homeHitters || [])];
+            const rosterData = allHitters.find(h =>
+              h.name === p.name ||
+              h.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim() === p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()
+            );
             const liveData = liveHRMap[p.name] ??
               liveHRMap[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()];
             const knownHR  = KNOWN_2026_HR[p.name];
-            const correctedHR  = liveData?.hr   ?? (knownHR != null ? knownHR : (p.seasonHRs ?? null));
-            const correctedGP  = liveData?.gp   ?? p.gamesPlayed ?? null;
-            const correctedAVG = liveData?.avg  ?? p.avg ?? null;
-            const correctedOPS = liveData?.ops  ?? p.ops ?? null;
-            const batterId     = liveData?.id   ?? p.mlbId ?? null;
+            const correctedHR  = rosterData?.hr ?? liveData?.hr ?? (knownHR != null ? knownHR : (p.seasonHRs ?? null));
+            const correctedGP  = rosterData?.gp ?? liveData?.gp ?? p.gamesPlayed ?? null;
+            const correctedAVG = rosterData?.avg ?? liveData?.avg ?? p.avg ?? null;
+            const correctedOPS = rosterData?.ops ?? liveData?.ops ?? p.ops ?? null;
+            const batterId     = rosterData?.id  ?? liveData?.id  ?? p.mlbId ?? null;
 
             // BvP from cache (populated by enrichBvP pass below)
             const bvpKey = (batterId || p.name) + "_" + p.pitcher;
