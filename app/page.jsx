@@ -1008,15 +1008,15 @@ function buildPrompt(games, weatherMap = {}, gameData = {}) {
       const gd  = gameData[key];
       if (!gd) return g.away + "@" + g.home + ": stats unavailable";
       const fmtHitters = (hitters, bvpMap, oppPitcher) =>
-        (hitters || []).slice(0, 8).map(h =>
-          h.name + " " + h.pos + " " + h.hr + "HR " + h.avg + "AVG " + h.ops + "OPS" +
-          (bvpMap[h.name] ? " | BvP vs " + oppPitcher + ": " + bvpMap[h.name].ab + "AB " + bvpMap[h.name].avg + "AVG " + bvpMap[h.name].hr + "HR" : "")
-        ).join(" / ");
+        (hitters || []).slice(0, 6).map(h =>
+          h.name + " " + h.hr + "HR " + h.avg +
+          (bvpMap[h.name] ? " BvP:" + bvpMap[h.name].hr + "HR/" + bvpMap[h.name].ab + "AB" : "")
+        ).join(", ");
       const awayStr = fmtHitters(gd.awayHitters, gd.awayBvP || {}, g.homeP);
       const homeStr = fmtHitters(gd.homeHitters, gd.homeBvP || {}, g.awayP);
-      const awayP = gd.awayPitcher ? g.awayP + " ERA " + (gd.awayPitcher.era || g.awayERA || "N/A") + " WHIP " + (gd.awayPitcher.whip || "N/A") : g.awayP + " ERA " + (g.awayERA || "N/A");
-      const homeP = gd.homePitcher ? g.homeP + " ERA " + (gd.homePitcher.era || g.homeERA || "N/A") + " WHIP " + (gd.homePitcher.whip || "N/A") : g.homeP + " ERA " + (g.homeERA || "N/A");
-      return g.away + "@" + g.home + ":\n  AWAY pitcher: " + awayP + "\n  HOME pitcher: " + homeP + "\n  " + g.away + " batters: " + awayStr + "\n  " + g.home + " batters: " + homeStr;
+      const awayP = g.awayP + " ERA " + (gd.awayPitcher?.era || g.awayERA || "?");
+      const homeP = g.homeP + " ERA " + (gd.homePitcher?.era || g.homeERA || "?");
+      return g.away + "@" + g.home + " | " + awayP + " | " + homeP + " | " + g.away + ": " + awayStr + " | " + g.home + ": " + homeStr;
     }),
     "",
     "REAL WEATHER PER GAME (include in weatherInsight):",
@@ -1031,7 +1031,10 @@ function buildPrompt(games, weatherMap = {}, gameData = {}) {
         (w.hrImpact === "positive" ? " HR-BOOST" : w.hrImpact === "negative" ? " HR-SUPPRESS" : "");
     }),
     "",
-    "TASK: For EACH game return exactly 5 HR candidates from the TWO TEAMS in THAT specific game (best HR spots first — mix both teams). Return 5 so filters have buffer.",
+    "TASK: For EACH game return exactly 3 HR candidates from the TWO TEAMS in THAT specific game.",
+    "Return 3 only — no more. Filters will handle verification.",
+    "Return ONLY the fields listed. NO extra fields. SHORT values only.",
+    "Return ONLY position players (outfielders, infielders, catchers, DH). NO pitchers.",
     "CRITICAL: ONLY include POSITION PLAYERS (batters). NEVER include pitchers as HR candidates.",
     "Return 5 players per game even if some are marginal — filters will trim to the best 3.",
     "CRITICAL: Do NOT include any player who is on the Injured List (IL) or listed as Day-To-Day (DTD).",
@@ -1066,7 +1069,7 @@ function buildPrompt(games, weatherMap = {}, gameData = {}) {
     "- hrChancePct (0-35), pitcher, pitcherHand, pitcherERA, pitcherWhip, hrAllowedVsTeam",
     "- bvpSummary (1 sentence with career stats vs this pitcher), homeAwaySplit (1 line)",
     "- weatherInsight: cite REAL weather — temp F, wind mph, direction vs field, HR impact",
-    "- seasonHRs (use exact number from list above), gamesPlayed, ops, exitVelo, parkFactor",
+    "- seasonHRs (use exact number from list above), gamesPlayed, ops, parkFactor",
     "- simHRs: HR hits out of 10000 simulations vs this specific pitcher today (integer)",
     "- hotStreak: HR count in last 10 games (integer, 0 if none)",
     "- hotStreakNote: 1 sentence on recent HR form",
@@ -1095,7 +1098,7 @@ function buildPrompt(games, weatherMap = {}, gameData = {}) {
     '"isHome":true,"hrChancePct":18.5,"pitcher":"Kyle Bradish","pitcherHand":"RHP","pitcherERA":4.20,"pitcherWhip":1.28,"hrAllowedVsTeam":3,',
     '"bvpSummary":"4 career HR vs Bradish in 22 AB, .364 AVG","homeAwaySplit":"HOME: 1.042 OPS 8HR | ROAD: .898 OPS 4HR",',
     '"weatherInsight":"67F partly cloudy 14mph wind OUT to RF — Yankee short porch HR boost",',
-    '"seasonHRs":12,"gamesPlayed":32,"ops":"1.052","exitVelo":"96.1","parkFactor":"1.10",',
+    '"seasonHRs":12,"gamesPlayed":32,"ops":"1.052","parkFactor":"1.10",',
     '"simHRs":1850,"confidence":88}]}]}',
   ].join("\n");
 }
@@ -1129,16 +1132,8 @@ export default function App() {
     { match:"players on IL",            pct:46, label:"Injury report loaded ✅" },
     { match:"Analyzing BvP",            pct:50, label:"Analyzing BvP matchups..." },
     { match:"Monte Carlo",              pct:55, label:"Running 10,000× simulations..." },
-    { match:"Analyzing batch 1",        pct:58, label:"Claude analyzing batch 1 of 5..." },
-    { match:"Batch 1 done",             pct:64, label:"Batch 1 complete ✅" },
-    { match:"Analyzing batch 2",        pct:66, label:"Claude analyzing batch 2 of 5..." },
-    { match:"Batch 2 done",             pct:72, label:"Batch 2 complete ✅" },
-    { match:"Analyzing batch 3",        pct:74, label:"Claude analyzing batch 3 of 5..." },
-    { match:"Batch 3 done",             pct:80, label:"Batch 3 complete ✅" },
-    { match:"Analyzing batch 4",        pct:80, label:"Claude analyzing batch 4 of 5..." },
-    { match:"Batch 4 done",             pct:84, label:"Batch 4 complete ✅" },
-    { match:"Analyzing batch 5",        pct:86, label:"Claude analyzing batch 5 of 5..." },
-    { match:"Batch 5 done",             pct:89, label:"Batch 5 complete ✅" },
+    { match:"Analyzing batch",          pct:60, label:"Claude analyzing games..." },
+    { match:"Batch",                    pct:82, label:"Batch complete ✅" },
     { match:"Verifying positions",      pct:86, label:"Verifying rosters & positions..." },
     { match:"All players verified",     pct:90, label:"All players verified ✅" },
     { match:"Fetching live BvP",        pct:92, label:"Fetching official BvP stats..." },
@@ -1231,7 +1226,7 @@ export default function App() {
       const allGameData = {};
 
       // Split into batches of 4 to avoid token limit
-      const BATCH = 3; // 3 games per batch prevents truncation
+      const BATCH = 2; // 2 games per batch — prevents all truncation
       const allGameResults = [];
       const batches = [];
       for (let i = 0; i < games.length; i += BATCH) {
