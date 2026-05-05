@@ -80,7 +80,7 @@ const ALL_GAMES = [
   { away:"ATL", home:"SEA", venue:"T-Mobile Park",      city:"Seattle",        st:"WA", time:"9:40 PM ET",
     awayP:"Bryce Elder",         awayH:"RHP", awayERA:1.88, awayRec:"3-1",
     homeP:"George Kirby",        homeH:"RHP", homeERA:3.00, homeRec:"4-2" },
-  { away:"PIT", home:"ARI", venue:"Chase Field",        city:"Phoenix",        st:"AZ", time:"9:40 PM ET",
+  { away:"PIT", home:"AZ",  venue:"Chase Field",        city:"Phoenix",        st:"AZ", time:"9:40 PM ET",
     awayP:"Bubba Chandler",      awayH:"RHP", awayERA:4.97, awayRec:"1-3",
     homeP:"Eduardo Rodriguez",   homeH:"LHP", homeERA:3.03, homeRec:"2-0" },
   { away:"SD",  home:"SF",  venue:"Oracle Park",        city:"San Francisco",  st:"CA", time:"9:45 PM ET",
@@ -149,6 +149,8 @@ const STADIUM_COORDS = {
   "Sutter Health Park":  { lat:38.5802, lon:-121.5005, dome:false, cfBearing:0,   plateFaces:"N — Sacramento heat, ball carries well in summer" },
   "Truist Park":         { lat:33.8907, lon:-84.4677,  dome:false, cfBearing:300, plateFaces:"WNW — RF 325ft, compact park" },
   "Guaranteed Rate":     { lat:41.8300, lon:-87.6339,  dome:false, cfBearing:130, plateFaces:"SE — open to lake winds" },
+  "Chase Field":         { lat:33.4453, lon:-112.0667, dome:true },
+  "Citizens Bank Park":  { lat:39.9061, lon:-75.1665,  dome:false, cfBearing:55,  plateFaces:"NE — RF 330ft LF 329ft hitter friendly" },
   // Domes — orientation irrelevant
   "Tropicana Field":     { lat:27.7682, lon:-82.6534,  dome:true },
   "Daikin Park":         { lat:29.7573, lon:-95.3555,  dome:true },
