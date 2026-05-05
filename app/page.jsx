@@ -1028,119 +1028,48 @@ function buildPrompt(games, weatherMap = {}, gameData = {}) {
   ).join("\n");
 
   return [
-    "You are an elite MLB home run analyst. Today is May 3 2026.",
+    "You are an MLB HR analyst. Today is May 5 2026.",
     "",
-    "KNOWN 2026 ROSTER FACTS (verify before adding any player):",
-    "Pete Alonso=BAL, Juan Soto=NYM, Max Fried=NYY, Aaron Judge=NYY, Gunnar Henderson=BAL,",
-    "Shohei Ohtani=LAD, Yordan Alvarez=HOU, Matt Olson=ATL, Kyle Schwarber=PHI, Bryce Harper=PHI,",
-    "Freddie Freeman=LAD, Mookie Betts=LAD, Rafael Devers=SF, Willy Adames=SF, Byron Buxton=MIN,",
-    "Jose Ramirez=CLE, Bobby Witt Jr=KC, Julio Rodriguez=SEA, Randy Arozarena=SEA,",
-    "Shea Langeliers=ATH, Nick Kurtz=ATH, James Wood=WSH, Mike Trout=LAA, Elly De La Cruz=CIN,",
-    "Nolan Arenado=STL, Jordan Walker=STL, Alex Bregman=BOS, Jarren Duran=BOS,",
-    "Fernando Tatis Jr=SD, Munetaka Murakami=CWS, Vladimir Guerrero Jr=TOR,",
-    "Francisco Lindor=NYM, Ian Happ=CHC, Pete Crow-Armstrong=CHC, Matt Chapman=SF",
+    "KNOWN 2026 ROSTER MOVES: Pete Alonso=BAL, Juan Soto=NYM, Max Fried=NYY, Aaron Judge=NYY,",
+    "Shohei Ohtani=LAD, Yordan Alvarez=HOU, Rafael Devers=SF, Willy Adames=SF,",
+    "Alex Bregman=BOS, Randy Arozarena=SEA, Paul Goldschmidt=NYY, Cody Bellinger=NYY,",
+    "Munetaka Murakami=CWS, Fernando Tatis Jr=SD, Ben Rice=NYY.",
     "",
-    "TODAY'S GAMES — ALL STATS BELOW ARE REAL DATA FROM MLB STATS API:",
-    lines,
-    "",
-    "REAL BATTER STATS (from MLB API — use these exact numbers):",
+    "REAL STATS (from MLB API — reference these for your analysis):",
     ...games.map(g => {
       const key = g.away + g.home;
+      const w   = weatherMap[key];
       const gd  = gameData[key];
-      if (!gd) return g.away + "@" + g.home + ": stats unavailable";
-      const fmtHitters = (hitters, bvpMap, oppPitcher) =>
-        (hitters || []).slice(0, 6).map(h =>
-          h.name + " " + h.hr + "HR " + h.avg +
-          (bvpMap[h.name] ? " BvP:" + bvpMap[h.name].hr + "HR/" + bvpMap[h.name].ab + "AB" : "")
-        ).join(", ");
-      const awayStr = fmtHitters(gd.awayHitters, gd.awayBvP || {}, g.homeP);
-      const homeStr = fmtHitters(gd.homeHitters, gd.homeBvP || {}, g.awayP);
-      const awayP = g.awayP + " ERA " + (gd.awayPitcher?.era || g.awayERA || "?");
-      const homeP = g.homeP + " ERA " + (gd.homePitcher?.era || g.homeERA || "?");
-      return g.away + "@" + g.home + " | " + awayP + " | " + homeP + " | " + g.away + ": " + awayStr + " | " + g.home + ": " + homeStr;
+      const wStr = w ? w.tempF + "F " + w.windSpeed + "mph " + w.windDir + "(" + (w.windVsField||"?") + ")" + (w.hrImpact==="positive"?" HR+":w.hrImpact==="negative"?" HR-":"") : "no data";
+      const fmtH = (hitters, bvpMap, oppP) => (hitters||[]).slice(0,5).map(h =>
+        h.name + " " + h.hr + "HR " + h.avg + (bvpMap[h.name] ? " BvP:" + bvpMap[h.name].hr + "HR/" + bvpMap[h.name].ab + "AB" : "")
+      ).join(", ");
+      const awayStr = gd ? fmtH(gd.awayHitters, gd.awayBvP||{}, g.homeP) : "";
+      const homeStr = gd ? fmtH(gd.homeHitters, gd.homeBvP||{}, g.awayP) : "";
+      return g.away+"@"+g.home+" | "+g.awayP+" ERA "+(g.awayERA||"?")+
+        " vs "+g.homeP+" ERA "+(g.homeERA||"?")+" | Weather:"+wStr+
+        (awayStr?" | "+g.away+":"+awayStr:"")+
+        (homeStr?" | "+g.home+":"+homeStr:"");
     }),
     "",
-    "REAL WEATHER PER GAME (include in weatherInsight):",
-    ...games.map(g => {
-      const key = g.away + g.home;
-      const w = weatherMap[key];
-      if (!w) return g.away + "@" + g.home + ": no weather data";
-      const plate = w.plateFaces ? w.plateFaces.split("—")[0].trim() : "";
-      return g.away + "@" + g.home + ": " + w.tempF + "F " +
-        w.windSpeed + "mph from " + w.windDir + " (" + (w.windVsField || "?") + ")" +
-        (plate ? " plate-" + plate : "") + " " + w.condition +
-        (w.hrImpact === "positive" ? " HR-BOOST" : w.hrImpact === "negative" ? " HR-SUPPRESS" : "");
-    }),
+    "TODAY'S GAMES:",
+    ...games.map(g => g.away+"@"+g.home+" "+g.venue+" "+g.time+" | Away SP:"+g.awayP+" "+g.awayH+" ERA "+(g.awayERA||"N/A")+" | Home SP:"+g.homeP+" "+g.homeH+" ERA "+(g.homeERA||"N/A")),
     "",
-    "TASK: For EACH game return exactly 3 HR candidates from the TWO TEAMS in THAT specific game.",
-    "Return 3 only — no more. Filters will handle verification.",
-    "Return ONLY the fields listed. NO extra fields. SHORT values only.",
-    "Return ONLY position players (outfielders, infielders, catchers, DH). NO pitchers.",
-    "CRITICAL: ONLY include POSITION PLAYERS (batters). NEVER include pitchers as HR candidates.",
-    "Return 5 players per game even if some are marginal — filters will trim to the best 3.",
-    "CRITICAL: Do NOT include any player who is on the Injured List (IL) or listed as Day-To-Day (DTD).",
-    "Do NOT suggest: Ronald Acuna Jr, any player known to be injured heading into May 4 2026.",
-    "CRITICAL: Every player MUST play for either the away team OR the home team of their specific game. No cross-game players.",
-    "Do NOT list any starting pitcher, relief pitcher, or anyone listed as SP/RP/LHP/RHP as a batter.",
-    "Players must be: outfielders, infielders, catchers, or designated hitters ONLY.",
-    "Include each player's MLB MLBAM ID for headshots.",
+    "TASK: Pick top 3 HR candidates per game. ONLY position players — NO pitchers.",
+    "Do NOT include anyone on the IL or injured.",
+    "Each player must actually play for one of the two teams in their game.",
     "",
-    "VERIFIED 2026 HR TOTALS through May 3 — USE THESE EXACT NUMBERS (source: MLB.com):",
-    "Aaron Judge=13HR, Munetaka Murakami=13HR, Yordan Alvarez=12HR, Ben Rice=12HR,",
-    "Matt Olson=11HR, Mike Trout=9HR, Kyle Schwarber=9HR, Gunnar Henderson=9HR,",
-    "Pete Alonso=8HR, Bryce Harper=8HR, Juan Soto=8HR, Jordan Walker=8HR,",
-    "Bobby Witt Jr=7HR, Vladimir Guerrero Jr=7HR, Jose Ramirez=7HR, Mookie Betts=7HR,",
-    "Freddie Freeman=7HR, Fernando Tatis Jr=7HR, Shohei Ohtani=7HR, Rafael Devers=7HR,",
-    "Elly De La Cruz=6HR, Julio Rodriguez=6HR, Randy Arozarena=6HR, Ian Happ=6HR,",
-    "Jarren Duran=6HR, Matt Chapman=6HR, Austin Riley=5HR, Shea Langeliers=5HR,",
-    "Pete Crow-Armstrong=5HR, Alex Bregman=5HR, Willy Adames=5HR, Nolan Arenado=5HR,",
-    "Francisco Lindor=5HR, Byron Buxton=5HR, Jackson Chourio=5HR, Manny Machado=5HR,",
-    "Nick Kurtz=4HR, James Wood=4HR, Vinnie Pasquantino=4HR, Salvador Perez=4HR,",
-    "Ketel Marte=4HR, Bo Bichette=4HR, Riley Greene=4HR, William Contreras=4HR,",
-    "Ozzie Albies=4HR, Jorge Soler=4HR, Spencer Torkelson=4HR, Corbin Carroll=3HR,",
-    "RULE: Use EXACT HR count listed above. For unlisted players estimate from pace/position.",
-    "CRITICAL: Do NOT invent or guess HR totals. If you don't know, use 0 rather than a wrong number.",
+    "Return ONLY this JSON — no extra fields, no weatherSummary, nothing else:",
+    '{"games":[{"away":"BAL","home":"NYY","players":[',
+    '{"name":"Aaron Judge","team":"NYY","isHome":true,"hrChancePct":18,"bvpNote":"4HR/22AB vs Gibson","weatherNote":"14mph OUT to RF","confidence":85},',
+    '{"name":"Pete Alonso","team":"BAL","isHome":false,"hrChancePct":12,"bvpNote":"1HR/15AB","weatherNote":"wind neutral","confidence":70}',
+    ']}]}',
     "",
-    "BvP vs TODAY'S PITCHER — provide career + 2026 HR stats:",
-    "- hrAllowedVsTeam: career HR this pitcher has allowed to the opposing team (integer)",
-    "- bvpSummary: include career AB, AVG, HR vs this specific pitcher if available",
-    "",
-    "For each player provide (be concise):",
-    "- name, team, mlbId, emoji, teamColor, isHome",
-    "- hrChancePct (0-35), pitcher, pitcherHand, pitcherERA, pitcherWhip, hrAllowedVsTeam",
-    "- bvpSummary (1 sentence with career stats vs this pitcher), homeAwaySplit (1 line)",
-    "- weatherInsight: cite REAL weather — temp F, wind mph, direction vs field, HR impact",
-    "- seasonHRs (use exact number from list above), gamesPlayed, ops, parkFactor",
-    "- simHRs: HR hits out of 1000 simulations vs this specific pitcher today (integer 0-350 range),",
-    "- hotStreak: HR count in last 10 games (integer, 0 if none)",
-    "- hotStreakNote: 1 sentence on recent HR form",
-    "- confidence: 0-100, boost up to 10pts for hot streak",
-    "",
-    "Park HR factors: Coors=1.38 SutterHealth=1.28 Wrigley=1.14 Yankee=1.10 Fenway=1.06",
-    "Angel=1.02 Target=1.02 Busch=1.01 Comerica=1.00 loanDepot=0.95 Tropicana=0.94 PNC=0.90 Petco=0.88 TMobile=0.85",
-    "",
-    "MLBAM IDs: Aaron Judge=592450, Shohei Ohtani=660271, Mookie Betts=605141,",
-    "Yordan Alvarez=670541, Matt Olson=621566, Kyle Schwarber=656941, Bryce Harper=547180,",
-    "Gunnar Henderson=683002, Pete Alonso=624413, Juan Soto=665742, Vladimir Guerrero Jr=665489,",
-    "Bo Bichette=666182, Jose Ramirez=608070, Elly De La Cruz=682829, Bobby Witt Jr=677951,",
-    "Mike Trout=545361, Nolan Arenado=571448, Freddie Freeman=518692, Rafael Devers=646240,",
-    "Fernando Tatis Jr=665487, Francisco Lindor=596019, James Wood=694192, Byron Buxton=621439,",
-    "Randy Arozarena=668227, Ian Happ=664023, Pete Crow-Armstrong=682998, Julio Rodriguez=677594,",
-    "Shea Langeliers=669127, Willy Adames=642715, Matt Chapman=656305, Jarren Duran=680776,",
-    "Alex Bregman=608324, Jackson Chourio=682626, Munetaka Murakami=673548, Nick Kurtz=695373",
-    "",
-    "CRITICAL JSON RULES: Use ONLY double-quotes. Start with { end with }. No other text.",
-    "Return ONLY the fields listed. Do NOT add weatherSummary, summary, notes, or any extra fields.",
-    "Keep values SHORT — bvpSummary max 10 words, weatherInsight max 12 words.",
-    "Return EXACTLY 5 players per game, no more, no less.",
-    "",
-    '{"games":[{"away":"BAL","home":"NYY","venue":"Yankee Stadium","time":"1:35 PM ET",',
-    '"players":[{"name":"Aaron Judge","team":"NYY","mlbId":592450,"emoji":"⚡","teamColor":"#003087",',
-    '"isHome":true,"hrChancePct":18.5,"pitcher":"Kyle Bradish","pitcherHand":"RHP","pitcherERA":4.20,"pitcherWhip":1.28,"hrAllowedVsTeam":3,',
-    '"bvpSummary":"4 career HR vs Bradish in 22 AB, .364 AVG","homeAwaySplit":"HOME: 1.042 OPS 8HR | ROAD: .898 OPS 4HR",',
-    '"weatherInsight":"67F partly cloudy 14mph wind OUT to RF — Yankee short porch HR boost",',
-    '"seasonHRs":12,"gamesPlayed":32,"ops":"1.052","parkFactor":"1.10",',
-    '"simHRs":185,"confidence":88}]}',
+    "RULES:",
+    "1. Double-quotes only. Start with { end with }.",
+    "2. Return EXACTLY 3 players per game.",
+    "3. Fields per player: name, team, isHome, hrChancePct (0-35), bvpNote (short), weatherNote (short), confidence (0-100).",
+    "4. NO other fields. SHORT values — max 8 words each.",
   ].join("\n");
 }
 
@@ -1532,59 +1461,54 @@ export default function App() {
             seenPlayers.add(k);
             return true;
           })
-          // 7. Attach live stats + hot streak
+          // 7. Fill in ALL stats from real fetched data — Claude only picked the player
           .map(p => {
-            const isHot = !!hotStreakMap[p.name];
+            const isHot    = !!hotStreakMap[p.name];
             const gameKey2 = gr.away + gr.home;
-            const gd2 = allGameData[gameKey2];
-            const allHitters = [...(gd2?.awayHitters || []), ...(gd2?.homeHitters || [])];
-            const rosterData = allHitters.find(h =>
-              h.name === p.name ||
-              h.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim() === p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()
-            );
-            const liveData = liveHRMap[p.name] ?? liveHRMap[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()];
-            const knownHR  = KNOWN_2026_HR[p.name];
-            const correctedHR  = rosterData?.hr ?? liveData?.hr ?? (knownHR != null ? knownHR : (p.seasonHRs ?? null));
-            const correctedGP  = rosterData?.gp ?? liveData?.gp ?? p.gamesPlayed ?? null;
-            const correctedOPS = rosterData?.ops ?? liveData?.ops ?? p.ops ?? null;
-            const batterId     = rosterData?.id  ?? liveData?.id  ?? p.mlbId ?? null;
-            const bvpKey = (batterId || p.name) + "_" + p.pitcher;
-            const bvp    = bvpCache[bvpKey];
-            const bvpStr = bvp
+            const gd2      = allGameData[gameKey2];
+            const nameKey  = n => n.replace(/\s+(Jr|Sr)\.?$/i,"").trim().toLowerCase();
+            const allHitters = [...(gd2?.awayHitters||[]), ...(gd2?.homeHitters||[])];
+            const roster   = allHitters.find(h => nameKey(h.name) === nameKey(p.name));
+            const live     = liveHRMap[p.name] ?? liveHRMap[nameKey(p.name)];
+            const known    = KNOWN_2026_HR[p.name];
+            const hr       = roster?.hr ?? live?.hr ?? (known ?? p.seasonHRs ?? null);
+            const gp       = roster?.gp ?? live?.gp ?? p.gamesPlayed ?? null;
+            const ops      = roster?.ops ?? live?.ops ?? p.ops ?? null;
+            const avg      = roster?.avg ?? live?.avg ?? p.avg ?? null;
+            const batterId = roster?.id  ?? live?.id  ?? p.mlbId ?? null;
+            // BvP from API cache
+            const bvpKey   = (batterId || p.name) + "_" + p.pitcher;
+            const bvp      = bvpCache[bvpKey];
+            const bvpStr   = bvp
               ? bvp.ab + " AB · " + bvp.avg + " AVG · " + bvp.hr + " HR"
-              : (p.bvpSummary || "No BvP data");
-
-            // ── Real Monte Carlo simulation using actual fetched stats ──
-            const pitcherForSim = p.isHome ? allGameData[gameKey2]?.awayPitcher : allGameData[gameKey2]?.homePitcher;
-            const weatherForSim = weatherMap[gameKey2];
-            const weatherBoost  = weatherForSim?.fieldBoost ?? 0;
-            const simBatter = rosterData || liveData || { hr: correctedHR || 3, gp: correctedGP || 30, ops: correctedOPS || "0.700", avg: ".250" };
-            const realSimCount  = runHRSimulation(simBatter, pitcherForSim, weatherBoost, 1000);
-            const realSimScaled = realSimCount; // raw /1000
-
-            // AI confidence score from Claude (0-100)
-            const aiConfidence = p.confidence ?? Math.round((p.hrChancePct ?? 0) * 3);
-
-            // Use real sim when we have roster data, else Claude's estimate
-            const validSims = rosterData ? realSimScaled
-              : (p.simHRs != null && p.simHRs >= 0 ? Math.min(p.simHRs, 1000) : realSimScaled);
+              : (p.bvpNote || p.bvpSummary || "No BvP data");
+            // Real Monte Carlo
+            const pitcher  = p.isHome ? gd2?.awayPitcher : gd2?.homePitcher;
+            const wBoost   = weatherMap[gameKey2]?.fieldBoost ?? 0;
+            const simBat   = roster || live || { hr: hr||3, gp: gp||30, ops: ops||"0.700", avg: avg||".250" };
+            const simCount = runHRSimulation(simBat, pitcher, wBoost, 1000);
+            // Weather note from real data
+            const w = weatherMap[gameKey2];
+            const weatherInsight = w
+              ? w.tempF + "°F · " + w.windSpeed + "mph " + w.windDir + " (" + (w.windVsField||"?") + ")" + (w.hrImpact==="positive"?" — HR boost 🚀":w.hrImpact==="negative"?" — HR suppressed 🛑":"")
+              : (p.weatherNote || p.weatherInsight || "");
             return {
               ...p,
-              team:        p.isHome ? teams.home : teams.away,
-              mlbId:       batterId,
-              seasonHRs:   correctedHR,
-              gamesPlayed: correctedGP,
-              ops:         correctedOPS || p.ops,
-              bvpSummary:  bvpStr,
-              bvpHR:       bvp?.hr ?? null,
-              bvpAB:       bvp?.ab ?? null,
-              bvpAVG:      bvp?.avg ?? null,
-              simHRs:      validSims != null ? Math.min(Math.round(validSims), 1000) : null,
-              realSim:     realSimCount,   // raw /1000 sim count
-              aiScore:     aiConfidence,   // Claude's AI confidence 0-100
-              hotStreak:   isHot,
-              hotNote:     hotStreakMap[p.name] || "",
-              hrChancePct: isHot ? Math.min(35, (p.hrChancePct ?? 0) + 2.5) : (p.hrChancePct ?? 0),
+              team:         p.isHome ? teams.home : teams.away,
+              mlbId:        batterId,
+              seasonHRs:    hr,
+              gamesPlayed:  gp,
+              ops,
+              avg,
+              bvpSummary:   bvpStr,
+              bvpHR:        bvp?.hr ?? null,
+              bvpAB:        bvp?.ab ?? null,
+              bvpAVG:       bvp?.avg ?? null,
+              weatherInsight,
+              simHRs:       Math.min(Math.round(simCount), 1000),
+              hotStreak:    isHot,
+              hotNote:      hotStreakMap[p.name] || "",
+              hrChancePct:  isHot ? Math.min(35, (p.hrChancePct??0)+2.5) : (p.hrChancePct??0),
             };
           })
           .sort((a, b) => (b.hrChancePct ?? 0) - (a.hrChancePct ?? 0))
