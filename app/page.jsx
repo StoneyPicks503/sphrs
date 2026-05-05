@@ -779,7 +779,9 @@ function HRBar({ pct, color }) {
 
 /* ── Player row inside game accordion ── */
 function PlayerRow({ p, rank, delay = 0 }) {
-  const hrPct = p.hrChancePct ?? ((p.simHRs ?? 0) / 100);
+  // Use sim result as the single HR% — real math from MLB stats
+  const simPct  = p.simHRs != null ? parseFloat(((p.simHRs / 1000) * 100).toFixed(1)) : null;
+  const hrPct   = simPct ?? p.hrChancePct ?? 0;
   const c = hrPct >= 20 ? "#00e676" : hrPct >= 12 ? "#ffca28" : hrPct >= 6 ? "#ffa726" : "#7a9abf";
   const glow = hrPct >= 15 ? "0 0 20px " + c + "88" : "none";
   const [expanded, setExpanded] = useState(false);
@@ -833,12 +835,8 @@ function PlayerRow({ p, rank, delay = 0 }) {
           <div style={{ fontFamily: F.bebas, fontSize: 26, color: c, lineHeight: 1, textShadow: glow }}>
             {hrPct.toFixed(1)}%
           </div>
-          <div style={{ fontFamily: F.mono, fontSize: 8, color: T.muted, marginBottom: 2 }}>HR CHANCE</div>
-          {p.simHRs != null && (
-            <div style={{ fontFamily: F.mono, fontSize: 8, color: c, background: c + "15", border: "1px solid " + c + "30", borderRadius: 4, padding: "2px 6px", textAlign: "center" }}>
-              {p.simHRs.toLocaleString()}<span style={{ color: T.muted }}>/1k</span>
-            </div>
-          )}
+          <div style={{ fontFamily: F.mono, fontSize: 8, color: T.muted, marginBottom: 2 }}>{simPct != null ? "SIM HR %" : "HR CHANCE"}</div>
+
         </div>
 
         {/* Expand arrow */}
@@ -876,7 +874,8 @@ function PlayerRow({ p, rank, delay = 0 }) {
               <div style={{ width:"100%", background:"rgba(0,230,118,0.08)", border:"1px solid rgba(0,230,118,0.3)", borderRadius:7, padding:"5px 10px", marginBottom:4, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                 <span style={{ fontFamily:F.mono, fontSize:9, color:"#00e676" }}>1,000× SIM ● REAL STATS</span>
                 <span style={{ fontFamily:F.arch, fontSize:13, color:"#00e676" }}>
-                  {p.simHRs.toLocaleString()}<span style={{ fontFamily:F.mono, fontSize:9, color:T.muted }}>/1k · {((p.simHRs/1000)*100).toFixed(1)}%</span>
+                  {((p.simHRs/1000)*100).toFixed(1)}%
+                  <span style={{ fontFamily:F.mono, fontSize:9, color:T.muted, marginLeft:6 }}>{p.simHRs}/1k trials</span>
                 </span>
               </div>
             )}
@@ -930,7 +929,7 @@ function GameCard({ game, result, isOpen, onToggle, onRemove, isRunning }) {
   const homeHot = (game.homeERA ?? 0) >= 5.5;
   const anyHot  = awayHot || homeHot;
   const players = result?.players ?? [];
-  const topHR   = players[0]?.hrChancePct ?? 0;
+  const topHR   = players[0]?.simHRs != null ? parseFloat(((players[0].simHRs/1000)*100).toFixed(1)) : (players[0]?.hrChancePct ?? 0);
 
   return (
     <div style={{
