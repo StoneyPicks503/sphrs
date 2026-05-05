@@ -1616,7 +1616,11 @@ export default function App() {
               hrChancePct:  p.hrChancePct ?? 0,
             };
           })
-          .sort((a, b) => (b.hrChancePct ?? 0) - (a.hrChancePct ?? 0))
+          .sort((a, b) => {
+            const aScore = a.simHRs ?? (a.hrChancePct ?? 0) * 10;
+            const bScore = b.simHRs ?? (b.hrChancePct ?? 0) * 10;
+            return bScore - aScore;
+          })
           .slice(0, 3); // Hard cap — always exactly 3 per game
 
         newResults[key] = { players: cleanPlayers };
