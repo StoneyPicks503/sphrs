@@ -572,41 +572,38 @@ async function fetchInjuredPlayers() {
 // Runs N simulations of a batter vs pitcher using real fetched stats
 // Returns number of simulated HR out of N attempts
 function runHRSimulation(batter, pitcher, weatherBoost = 0, N = 1000) {
-  // Base HR rate from batter stats
-  const ops     = parseFloat(batter?.ops  || "0.700") || 0.700;
-  const avg     = parseFloat(batter?.avg  || "0.250") || 0.250;
-  const slg     = parseFloat(batter?.slg  || "0.400") || 0.400;
-  const gp      = batter?.gp || 30;
-  const hr      = batter?.hr || 3;
+  const gp  = batter?.gp || 33;
+  const hr  = batter?.hr || 4;
+  const ops = parseFloat(batter?.ops || "0.750") || 0.750;
 
-  // Estimate HR rate per PA from real stats
-  // Approx PA = games * 4, HR/PA = known rate
-  const paEstimate  = Math.max(gp * 3.8, 50);
-  const baseHRRate  = hr / paEstimate; // e.g. 13HR/120PA = 0.108
+  // Real MLB HR rate per game for a batter:
+  // League avg is ~1.1 HR per team per game = ~0.037 per PA
+  // But we simulate per GAME not per PA
+  // Good HR hitter: ~0.25 HR/game (hits one every 4 games)
+  // Avg hitter:     ~0.10 HR/game (hits one every 10 games)
+  // Low HR hitter:  ~0.05 HR/game
 
-  // Pitcher adjustment — ERA reflects run prevention, HR/9 would be ideal
-  // We approximate: high ERA pitcher = more HRs allowed
-  const pitcherERA  = parseFloat(pitcher?.era || "4.00") || 4.00;
-  const pitcherAdj  = pitcherERA / 4.00; // 1.0 = league avg, >1 = HR-friendly
+  // Base rate = HR / games played (HR per game)
+  const baseRate = Math.max(hr / Math.max(gp, 20), 0.03);
 
-  // Park factor adjustment
-  const parkFactor  = parseFloat(batter?.parkFactor || "1.00") || 1.00;
+  // OPS boost — above .800 OPS = above avg power
+  const opsBoost = Math.max(0, (ops - 0.700) * 0.15);
 
-  // Weather boost from wind analysis (-0.15 to +0.15)
-  const weatherAdj  = Math.max(-0.15, Math.min(0.15, weatherBoost));
+  // Pitcher ERA adjustment — scale around league avg ERA of 4.20
+  const era = parseFloat(pitcher?.era || "4.20") || 4.20;
+  const pitcherMult = Math.max(0.6, Math.min(1.6, era / 4.20));
 
-  // Final HR probability per PA
-  const hrProb = Math.min(
-    baseHRRate * pitcherAdj * parkFactor * (1 + weatherAdj),
-    0.35 // cap at 35%
-  );
+  // Weather: fieldBoost is -1 (blowing in) to +1 (blowing out)
+  const weatherMult = 1 + (Math.max(-1, Math.min(1, weatherBoost)) * 0.12);
 
-  // Run N simulations
+  // Final probability per simulated game
+  const hrProb = Math.min(0.45, (baseRate + opsBoost) * pitcherMult * weatherMult);
+
   let hits = 0;
   for (let i = 0; i < N; i++) {
     if (Math.random() < hrProb) hits++;
   }
-  return hits; // out of N
+  return hits; // out of N (e.g. 185 out of 1000 = 18.5%)
 }
 
 /* ── JSON helpers ── */
