@@ -1040,14 +1040,16 @@ function buildPrompt(games, weatherMap = {}, gameData = {}) {
     "GAMES:",
     ...games.map(g => g.away+"@"+g.home+" "+g.venue+" "+g.time),
     "",
-    "TASK: For each game pick the TOP 3 HR candidates (position players only, no pitchers, no IL players).",
+    "TASK: For each game pick the TOP 6 HR candidates (position players only, no pitchers, no IL players).",
     "Reply in EXACTLY this format, one game per line, nothing else:",
     "",
     "BOS@DET: Riley Greene 82, Spencer Torkelson 71, Kerry Carpenter 65",
     "NYY@TEX: Aaron Judge 90, Jazz Chisholm 72, Anthony Volpe 61",
     "",
-    "Format: AWAY@HOME: FirstName LastName SCORE, FirstName LastName SCORE, FirstName LastName SCORE",
-    "SCORE = confidence 0-100. EXACTLY 3 players per line, ALWAYS.",
+    "Format: AWAY@HOME: Player1 SCORE, Player2 SCORE, Player3 SCORE, Player4 SCORE, Player5 SCORE, Player6 SCORE",
+    "SCORE = confidence 0-100. Give 6 players per game line.",
+    "Mix both teams — pick the best HR spots regardless of home/away.",
+    "Example: BOS@DET: Riley Greene 85, Spencer Torkelson 74, Jarren Duran 72, Kerry Carpenter 68, Alex Bregman 61, Masataka Yoshida 55",
     "ONLY position players (outfielders, infielders, catchers, DH). NO pitchers ever.",
     "ONLY players on the two teams listed. NO extra text, NO explanations, NO numbering.",
     "If unsure who plays for a team, pick their known star hitters.",
@@ -1238,7 +1240,7 @@ export default function App() {
             .map(p => p.trim())
             .filter(p => p.length > 2 && /[A-Za-z]/.test(p));
 
-          const players = playerEntries.slice(0, 5).map(entry => {
+          const players = playerEntries.slice(0, 8).map(entry => {
             // Strip any leading/trailing punctuation or numbers that aren't part of name
             entry = entry.replace(/^[\d.\-•*]+\s*/, "").trim();
             // Extract trailing score number (e.g. "Aaron Judge 85" or "Aaron Judge (85)")
@@ -1498,10 +1500,14 @@ export default function App() {
             const k = p.name.toLowerCase().replace(/\s+(jr|sr)\.?$/i,"").trim();
             return arr.findIndex(x => x.name.toLowerCase().replace(/\s+(jr|sr)\.?$/i,"").trim() === k) === i;
           })
-          // 6. Cross-game dedup
+          // 6. Cross-game dedup — only block if same player appears in 2 different games
+          // (rare since players only play one game per day)
           .filter(p => {
             const k = p.name.toLowerCase().replace(/\s+(jr|sr)\.?$/i,"").trim();
-            if (seenPlayers.has(k)) return false;
+            if (seenPlayers.has(k)) {
+              console.log("Cross-game dedup removed:", p.name);
+              return false;
+            }
             seenPlayers.add(k);
             return true;
           })
