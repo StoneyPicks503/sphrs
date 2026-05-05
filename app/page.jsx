@@ -936,11 +936,47 @@ export default function App() {
   const [openGames, setOpenGames] = useState(new Set());
   const [phase,    setPhase]    = useState("ready");
   const [logs,     setLogs]     = useState([]);
+  const [stepLabel, setStepLabel] = useState("");
+  const [progress,  setProgress]  = useState(0);
   const [results,  setResults]  = useState({});  // key: away+home → { players }
   const [errMsg,   setErrMsg]   = useState("");
   const busy = useRef(false);
 
   const pushLog = msg => setLogs(p => [...p.slice(-12), msg]);
+
+  // Progress steps — drives the loading bar
+  const STEPS = [
+    { match:"Loading",                  pct:5,  label:"Loading games..." },
+    { match:"Fetching live weather",    pct:12, label:"Fetching live weather..." },
+    { match:"Weather loaded",           pct:18, label:"Weather loaded ✅" },
+    { match:"Fetching live 2026 HR",    pct:25, label:"Fetching live HR stats from MLB..." },
+    { match:"Live HR",                  pct:30, label:"HR stats loaded ✅" },
+    { match:"Fetching pitcher IDs",     pct:35, label:"Resolving pitcher IDs..." },
+    { match:"pitcher IDs resolved",     pct:38, label:"Pitcher IDs ready ✅" },
+    { match:"Checking MLB injury",      pct:42, label:"Checking injury report..." },
+    { match:"players on IL",            pct:46, label:"Injury report loaded ✅" },
+    { match:"Analyzing BvP",            pct:50, label:"Analyzing BvP matchups..." },
+    { match:"Monte Carlo",              pct:55, label:"Running 10,000× simulations..." },
+    { match:"Analyzing batch 1",        pct:60, label:"Claude analyzing batch 1..." },
+    { match:"Batch 1 done",             pct:68, label:"Batch 1 complete ✅" },
+    { match:"Analyzing batch 2",        pct:70, label:"Claude analyzing batch 2..." },
+    { match:"Batch 2 done",             pct:78, label:"Batch 2 complete ✅" },
+    { match:"Analyzing batch 3",        pct:80, label:"Claude analyzing batch 3..." },
+    { match:"Batch 3 done",             pct:84, label:"Batch 3 complete ✅" },
+    { match:"Verifying positions",      pct:86, label:"Verifying rosters & positions..." },
+    { match:"All players verified",     pct:90, label:"All players verified ✅" },
+    { match:"Fetching live BvP",        pct:92, label:"Fetching official BvP stats..." },
+    { match:"BvP data fetched",         pct:97, label:"BvP data loaded ✅" },
+    { match:"games analyzed",           pct:100,label:"Analysis complete! 🎉" },
+  ];
+  const setStep = msg => {
+    setLogs(p => [...p.slice(-12), msg]);
+    const step = STEPS.find(s => msg.includes(s.match));
+    if (step) {
+      setStepLabel(step.label);
+      setProgress(step.pct);
+    }
+  };
 
   const toggleGame = (key) => setOpenGames(prev => {
     const next = new Set(prev);
@@ -967,52 +1003,52 @@ export default function App() {
   const run = async () => {
     if (busy.current || games.length === 0) return;
     busy.current = true;
-    setPhase("running"); setLogs([]); setErrMsg("");
+    setPhase("running"); setLogs([]); setErrMsg(""); setProgress(0); setStepLabel("Starting...");
 
     try {
-      pushLog("⚾ Loading " + games.length + " game(s)...");
+      setStep("⚾ Loading " + games.length + " game(s)...");
       await new Promise(r => setTimeout(r, 150));
 
       // ── Fetch real weather for all stadiums in parallel ──
-      pushLog("🌤 Fetching live weather for all " + games.length + " stadiums...");
+      setStep("🌤 Fetching live weather for all " + games.length + " stadiums...");
       const weatherMap = await fetchWeatherForGames(games);
       const weatherHits = Object.values(weatherMap).filter(w => w !== null).length;
-      pushLog("✅ Weather loaded — " + weatherHits + " stadiums · " + (games.length - weatherHits) + " unavailable");
+      setStep("✅ Weather loaded — " + weatherHits + " stadiums · " + (games.length - weatherHits) + " unavailable");
 
       // ── Fetch LIVE 2026 HR stats from MLB API ──
-      pushLog("📊 Fetching live 2026 HR stats from MLB Stats API...");
+      setStep("📊 Fetching live 2026 HR stats from MLB Stats API...");
       const liveHRMap = await fetchLiveHRStats();
       const liveCount = Object.keys(liveHRMap).length;
-      pushLog(liveCount > 0
+      setStep(liveCount > 0
         ? "✅ Live HR data — " + liveCount + " players loaded"
         : "⚠️ HR fetch failed — using verified fallback");
 
       // ── Fetch pitcher MLBAM IDs for BvP lookups ──
       const allPitcherNames = [...new Set(games.map(g => [g.awayP, g.homeP]).flat().filter(p => p && p !== "TBD"))];
-      pushLog("⚔️ Fetching pitcher IDs for BvP lookups (" + allPitcherNames.length + " pitchers)...");
+      setStep("⚔️ Fetching pitcher IDs for BvP lookups (" + allPitcherNames.length + " pitchers)...");
       const pitcherIdMap = await fetchPitcherIds(allPitcherNames);
-      pushLog("✅ " + Object.keys(pitcherIdMap).length + " pitcher IDs resolved");
+      setStep("✅ " + Object.keys(pitcherIdMap).length + " pitcher IDs resolved");
 
       // BvP cache — populated after we know which batters face which pitchers
       const bvpCache = {};
 
       // ── Fetch live injury report ──
-      pushLog("🏥 Checking MLB injury report...");
+      setStep("🏥 Checking MLB injury report...");
       const injuredPlayers = await fetchInjuredPlayers();
       if (injuredPlayers.size > 0) {
-        pushLog("🏥 " + injuredPlayers.size + " players on IL — will be excluded from picks");
+        setStep("🏥 " + injuredPlayers.size + " players on IL — will be excluded from picks");
       }
 
       // Log any standout weather
       Object.entries(weatherMap).forEach(([k, w]) => {
-        if (w && w.hrImpact === "positive") pushLog("🌬️ HR weather boost: " + k + " — " + w.summary);
-        if (w && w.hrImpact === "negative") pushLog("🧊 HR weather suppress: " + k + " — " + w.summary);
+        if (w && w.hrImpact === "positive") setStep("🌬️ HR weather boost: " + k + " — " + w.summary);
+        if (w && w.hrImpact === "negative") setStep("🧊 HR weather suppress: " + k + " — " + w.summary);
       });
 
       await new Promise(r => setTimeout(r, 150));
-      pushLog("📊 Analyzing BvP + HR chance % per player...");
+      setStep("📊 Analyzing BvP + HR chance % per player...");
       await new Promise(r => setTimeout(r, 150));
-      pushLog("🎲 Running 10,000-game Monte Carlo...");
+      setStep("🎲 Running 10,000-game Monte Carlo...");
       await new Promise(r => setTimeout(r, 150));
 
       // Split into batches of 6 to avoid token limit
@@ -1030,16 +1066,16 @@ export default function App() {
       })));
 
       for (let b = 0; b < batches.length; b++) {
-        pushLog("🤖 Analyzing batch " + (b + 1) + " of " + batches.length + " (" + batches[b].length + " games)...");
+        setStep("🤖 Analyzing batch " + (b + 1) + " of " + batches.length + " (" + batches[b].length + " games)...");
         const raw    = await callClaude(buildPrompt(batches[b], weatherMap), 8192);
         const parsed = grabJSON(raw);
         const batchResults = parsed.games ?? [];
         allGameResults.push(...batchResults);
-        pushLog("✅ Batch " + (b + 1) + " done — " + batchResults.length + " games analyzed");
+        setStep("✅ Batch " + (b + 1) + " done — " + batchResults.length + " games analyzed");
       }
 
       // ── VERIFICATION PASS ─────────────────────────────────────────────────
-      pushLog("🔍 Verifying positions, rosters & hot streaks...");
+      setStep("🔍 Verifying positions, rosters & hot streaks...");
 
       // Collect ALL players across all games
       const allPlayers = [];
@@ -1091,16 +1127,16 @@ export default function App() {
         const hotPlayers = verifyChecks.filter(c => c.hotStreak === true);
 
         if (flagged.length > 0) {
-          flagged.forEach(f => pushLog("⚠️ Removed " + f.name + " — " + (f.reason || "failed check")));
+          flagged.forEach(f => setStep("⚠️ Removed " + f.name + " — " + (f.reason || "failed check")));
         }
         if (hotPlayers.length > 0) {
-          pushLog("🔥 Hot streaks: " + hotPlayers.map(h => h.name).join(", "));
+          setStep("🔥 Hot streaks: " + hotPlayers.map(h => h.name).join(", "));
         }
         if (flagged.length === 0) {
-          pushLog("✅ All players verified — position players on correct 2026 rosters");
+          setStep("✅ All players verified — position players on correct 2026 rosters");
         }
       } catch (_) {
-        pushLog("⚠️ Verification inconclusive — using original picks");
+        setStep("⚠️ Verification inconclusive — using original picks");
         verifyChecks = uniqueForVerify.map((_, i) => ({ i, ok: true, hotStreak: false, hotNote: "" }));
       }
 
@@ -1240,7 +1276,7 @@ export default function App() {
             if (knownTeam) {
               if (!validTeams.has(knownTeam)) {
                 // 100% certain wrong game — remove
-                pushLog("⚠️ " + p.name + " is on " + knownTeam + " not playing in " + teams.away + "@" + teams.home);
+                setStep("⚠️ " + p.name + " is on " + knownTeam + " not playing in " + teams.away + "@" + teams.home);
                 return false;
               }
               // Correct team/isHome assignment
@@ -1267,7 +1303,7 @@ export default function App() {
               p.name.replace(/\s+Sr\.?$/i, "").trim(),
             ];
             const isInjured = variants.some(v => injuredPlayers.has(v));
-            if (isInjured) pushLog("🏥 " + p.name + " on IL — removed from picks");
+            if (isInjured) setStep("🏥 " + p.name + " on IL — removed from picks");
             return !isInjured;
           })
           // 3. Global dedup — prevent same player in two games
@@ -1333,7 +1369,7 @@ export default function App() {
       });
 
       // ── BvP enrichment pass — fetch real BvP for each player/pitcher pair ──
-      pushLog("⚔️ Fetching live BvP stats from MLB API...");
+      setStep("⚔️ Fetching live BvP stats from MLB API...");
       const bvpFetches = [];
       Object.values(newResults).forEach(gr => {
         (gr.players ?? []).forEach(p => {
@@ -1359,11 +1395,11 @@ export default function App() {
       });
       await Promise.all(bvpFetches);
       const bvpCount = Object.keys(bvpCache).length;
-      pushLog("✅ BvP data fetched — " + bvpCount + " matchup" + (bvpCount !== 1 ? "s" : "") + " with official stats");
+      setStep("✅ BvP data fetched — " + bvpCount + " matchup" + (bvpCount !== 1 ? "s" : "") + " with official stats");
 
       setResults({...newResults}); // trigger re-render with BvP data
       setOpenGames(new Set(games.map(g => g.away + g.home)));
-      pushLog("✅ All " + allGameResults.length + " games analyzed! Click any game to see HR %.");
+      setStep("✅ All " + allGameResults.length + " games analyzed! Click any game to see HR %.");
       setPhase("done");
 
     } catch (e) {
@@ -1462,16 +1498,47 @@ export default function App() {
 
         {/* Running log */}
         {phase === "running" && (
-          <div style={{ background:T.panel, border:"1px solid "+T.accent+"40", borderRadius:13, padding:"18px 16px", animation:"hrs-glow 2s ease infinite", marginBottom:14 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:14 }}>
-              <Spin size={26} />
-              <div>
-                <div style={{ fontFamily:F.arch, fontSize:14, color:T.accent }}>Analyzing {games.length} games...</div>
-                <div style={{ fontFamily:F.mono, fontSize:10, color:T.muted }}>BvP Avg · Day/Night BA · Weather Check · 10,000× Monte Carlo</div>
+          <div style={{
+            background: T.panel, border: "1px solid " + T.accent + "40",
+            borderRadius: 16, padding: "28px 22px",
+            animation: "hrs-glow 2s ease infinite", marginBottom: 14,
+            textAlign: "center",
+          }}>
+            {/* Spinner + title */}
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:12, marginBottom:18 }}>
+              <Spin size={22} />
+              <div style={{ fontFamily:F.arch, fontSize:15, color:T.accent, letterSpacing:1 }}>
+                Analyzing {games.length} Games
               </div>
             </div>
-            <div style={{ borderTop:"1px solid "+T.border, paddingTop:10 }}>
-              {logs.map((l, i) => <LogLine key={i} text={l} active={i === logs.length - 1} />)}
+
+            {/* Progress bar */}
+            <div style={{ background:"rgba(0,0,0,0.35)", borderRadius:8, height:10, overflow:"hidden", marginBottom:10, position:"relative" }}>
+              <div style={{
+                height:"100%",
+                width: progress + "%",
+                background: progress >= 100
+                  ? "linear-gradient(90deg,#00e676,#00c853)"
+                  : "linear-gradient(90deg," + T.accent + ",#0066ff)",
+                borderRadius: 8,
+                boxShadow: "0 0 16px " + (progress >= 100 ? "#00e676" : T.accent) + "88",
+                transition: "width 0.6s cubic-bezier(0.4,0,0.2,1)",
+              }} />
+            </div>
+
+            {/* % and current step */}
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+              <div style={{ fontFamily:F.mono, fontSize:10, color:T.muted, textAlign:"left", flex:1 }}>
+                {stepLabel}
+              </div>
+              <div style={{ fontFamily:F.bebas, fontSize:22, color: progress >= 100 ? "#00e676" : T.accent, lineHeight:1 }}>
+                {progress}%
+              </div>
+            </div>
+
+            {/* Subtitle */}
+            <div style={{ fontFamily:F.mono, fontSize:9, color:T.muted, letterSpacing:1, marginTop:4 }}>
+              WEATHER · LIVE HR STATS · BvP · INJURY REPORT · MONTE CARLO · ROSTERS
             </div>
           </div>
         )}
