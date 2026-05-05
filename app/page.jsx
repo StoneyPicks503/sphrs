@@ -611,22 +611,25 @@ function runHRSimulation(batter, pitcher, weatherBoost = 0, N = 1000) {
 
 /* ── JSON helpers ── */
 function sanitize(s) {
+  // Smart quotes
   s = s.replace(/[\u201c\u201d]/g, '"').replace(/[\u2018\u2019]/g, "'");
+  // Fix keys with wrong quotes
   s = s.replace(/'([A-Za-z_][A-Za-z0-9_]{0,50})['"]\s*:/g, '"$1":');
   s = s.replace(/"([A-Za-z_][A-Za-z0-9_]{0,50})'\s*:/g, '"$1":');
-  // Fix missing commas between properties: "value" "key": → "value", "key":
-  s = s.replace(/"(\s*)"([A-Za-z_])/g, '", "$2');
-  // Fix missing commas between } and next property
-  s = s.replace(/\}(\s*)"([A-Za-z_])/g, '}, "$2');
-  // Fix missing commas between ] and next property
-  s = s.replace(/\](\s*)"([A-Za-z_])/g, '], "$2');
-  // Fix Claude using parentheses () instead of brackets [] for arrays
+  // Fix unquoted string values after colon: :"some text" missing opening quote
+  s = s.replace(/:\s*([A-Za-z][^",}\]\n]{1,60}?)(\s*[,}\]])/g, (m, val, end) => {
+    const trimmed = val.trim();
+    if (trimmed === 'true' || trimmed === 'false' || trimmed === 'null') return m;
+    if (!isNaN(trimmed)) return m;
+    return ':"' + trimmed + '"' + end;
+  });
+  // Fix parentheses instead of brackets
   s = s.replace(/:\s*\(\s*\{/g, ': [{');
   s = s.replace(/\}\s*\)/g, '}]');
   // Trailing commas
   s = s.replace(/,(\s*[}\]])/g, '$1');
-  s = s.replace(/:\s*True\b/g, ': true').replace(/:\s*False\b/g, ': false').replace(/:\s*None\b/g, ': null').replace(/:\s*undefined\b/g, ': null');
-  s = s.replace(/:\s*\.(\d+)/g, ': 0.$1');
+  // Python literals
+  s = s.replace(/:\s*True\b/g, ': true').replace(/:\s*False\b/g, ': false').replace(/:\s*None\b/g, ': null');
   return s;
 }
 function grabJSON(raw) {
@@ -1061,15 +1064,16 @@ function buildPrompt(games, weatherMap = {}, gameData = {}) {
     "",
     "Return ONLY this JSON — no extra fields, no weatherSummary, nothing else:",
     '{"games":[{"away":"BAL","home":"NYY","players":[',
-    '{"name":"Aaron Judge","team":"NYY","isHome":true,"hrChancePct":18,"bvpNote":"4HR/22AB vs Gibson","weatherNote":"14mph OUT to RF","confidence":85},',
-    '{"name":"Pete Alonso","team":"BAL","isHome":false,"hrChancePct":12,"bvpNote":"1HR/15AB","weatherNote":"wind neutral","confidence":70}',
+    '{"name":"Aaron Judge","team":"NYY","isHome":true,"hrChancePct":18,"confidence":85},',
+    '{"name":"Pete Alonso","team":"BAL","isHome":false,"hrChancePct":12,"confidence":70}',
     ']}]}',
     "",
     "RULES:",
     "1. Double-quotes only. Start with { end with }.",
     "2. Return EXACTLY 3 players per game.",
-    "3. Fields per player: name, team, isHome, hrChancePct (0-35), bvpNote (short), weatherNote (short), confidence (0-100).",
-    "4. NO other fields. SHORT values — max 8 words each.",
+    "3. Fields per player: name (string), team (string), isHome (bool), hrChancePct (number 0-35), confidence (number 0-100).",
+    "4. ONLY those 5 fields. NO bvpNote, NO weatherNote, NO other fields.",
+    "5. No text outside the JSON object.",
   ].join("\n");
 }
 
