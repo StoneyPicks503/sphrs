@@ -438,21 +438,21 @@ async function fetchPitcherIds(pitcherNames) {
   // Then try API for any missing
   const missing = pitcherNames.filter(n => !idMap[n]);
   if (missing.length === 0) return idMap;
-  await Promise.all(missing.map(async name => {
+  for (const name of missing) {
     try {
       const encoded = encodeURIComponent(name);
       const url = "https://statsapi.mlb.com/api/v1/people/search?names=" + encoded +
         "&season=2026&sportId=1&fields=people,fullName,id,primaryPosition,abbreviation";
       const r = await fetch(url);
       const d = await r.json();
-      // Try exact match first, then partial
       let match = (d.people ?? []).find(p => p.fullName?.toLowerCase() === name.toLowerCase());
       if (!match) match = (d.people ?? []).find(p =>
         p.fullName?.toLowerCase().includes(name.split(" ").slice(-1)[0].toLowerCase())
       );
       if (match) idMap[name] = match.id;
+      await new Promise(r => setTimeout(r, 80));
     } catch (_) {}
-  }));
+  }
   return idMap;
 }
 
@@ -484,33 +484,15 @@ async function fetchTeamHitters(teamAbbr) {
       p.primaryPosition?.abbreviation !== "TWP"
     );
 
-    // Fetch season stats for each in parallel (limit to 13 players)
-    const results = await Promise.all(posPlayers.slice(0, 13).map(async p => {
-      try {
-        const statsUrl = "https://statsapi.mlb.com/api/v1/people/" + p.person.id +
-          "/stats?stats=season&season=2026&group=hitting" +
-          "&fields=stats,splits,stat,homeRuns,gamesPlayed,avg,ops,sluggingPct,atBats,strikeOuts";
-        const sr = await fetch(statsUrl);
-        const sd = await sr.json();
-        const stat = sd.stats?.[0]?.splits?.[0]?.stat ?? {};
-        return {
-          name:  p.person.fullName,
-          id:    p.person.id,
-          team:  teamAbbr,
-          pos:   p.primaryPosition?.abbreviation ?? "?",
-          hr:    stat.homeRuns   ?? 0,
-          gp:    stat.gamesPlayed ?? 0,
-          avg:   stat.avg        ?? ".000",
-          ops:   stat.ops        ?? ".000",
-          slg:   stat.sluggingPct ?? ".000",
-          ab:    stat.atBats     ?? 0,
-          so:    stat.strikeOuts ?? 0,
-        };
-      } catch (_) {
-        return { name: p.person.fullName, id: p.person.id, team: teamAbbr, hr: 0, gp: 0, avg: ".000", ops: ".000" };
-      }
-    }));
-    return results.filter(p => p.name);
+    // Return basic roster without individual stat calls to reduce API load
+    // Stats come from liveHRMap (league leaderboard) instead
+    return posPlayers.slice(0, 10).map(p => ({
+      name: p.person.fullName,
+      id:   p.person.id,
+      team: teamAbbr,
+      pos:  p.primaryPosition?.abbreviation ?? "?",
+      hr: 0, gp: 0, avg: ".000", ops: ".000",
+    })).filter(p => p.name);
   } catch (_) {
     return [];
   }
@@ -563,36 +545,29 @@ async function fetchBvPBatch(batters, pitcherId) {
   return results;
 }
 
-/* Master pre-fetch — gets all real data for a batch of games */
+/* Master pre-fetch — sequential to avoid rate limits */
 async function prefetchGameData(games) {
   const gameData = {};
-  await Promise.all(games.map(async g => {
+  for (const g of games) {
     const key = g.away + g.home;
     try {
-      // Fetch rosters + stats for both teams in parallel
       const [awayHitters, homeHitters, awayPitcher, homePitcher] = await Promise.all([
         fetchTeamHitters(g.away),
         fetchTeamHitters(g.home),
         fetchPitcherData(g.awayP),
         fetchPitcherData(g.homeP),
       ]);
-
-      // Fetch BvP for all hitters vs opposing pitcher
-      const [awayBvP, homeBvP] = await Promise.all([
-        fetchBvPBatch(awayHitters, homePitcher?.id),
-        fetchBvPBatch(homeHitters, awayPitcher?.id),
-      ]);
-
       gameData[key] = {
         away: g.away, home: g.home,
         awayHitters, homeHitters,
         awayPitcher, homePitcher,
-        awayBvP, homeBvP,
+        awayBvP: {}, homeBvP: {},
       };
     } catch (_) {
       gameData[key] = null;
     }
-  }));
+    await new Promise(r => setTimeout(r, 150)); // pause between games
+  }
   return gameData;
 }
 
@@ -1737,7 +1712,8 @@ export default function App() {
       setStep("⚔️ Fetching live BvP stats from MLB API...");
       const bvpFetches = [];
       Object.values(newResults).forEach(gr => {
-        (gr.players ?? []).forEach(p => {
+        // Only enrich top 2 players per game to limit API calls
+        (gr.players ?? []).slice(0, 2).forEach(p => {
           // Stamp pitcher details from ALL_GAMES lookup if not already set
           if (p.pitcher && (!p.pitcherHand || p.pitcherHand === "undefined")) {
             const det = pitcherDetailMap[p.pitcher];
@@ -1758,26 +1734,22 @@ export default function App() {
           if (batterId && pitcherId) {
             const cacheKey = batterId + "_" + pitcherName;
             bvpFetches.push(
-              Promise.all([
-                fetchBvP(batterId, pitcherId),
-                fetchPitcherArsenal(pitcherId),
-              ]).then(([bvp, arsenal]) => {
+              fetchBvP(batterId, pitcherId).then(bvp => {
                 if (bvp) {
                   bvpCache[cacheKey] = bvp;
-                  p.bvpSummary = (bvp.ab || 0) + " AB · " + (bvp.avg || ".000") + " AVG · " + (bvp.hr || 0) + " HR";
-                  p.bvpHR  = bvp.hr;
-                  p.bvpAB  = bvp.ab;
-                  p.bvpAVG = bvp.avg;
-                }
-                if (arsenal && arsenal.length > 0) {
-                  p.pitcherArsenal = arsenal;
+                  p.bvpSummary = (bvp.ab||0)+" AB · "+(bvp.avg||".000")+" AVG · "+(bvp.hr||0)+" HR";
+                  p.bvpHR = bvp.hr; p.bvpAB = bvp.ab; p.bvpAVG = bvp.avg;
                 }
               })
             );
           }
         });
       });
-      await Promise.all(bvpFetches);
+      // Sequential BvP fetches to avoid rate limit
+      for (const fetch of bvpFetches) {
+        await fetch;
+        await new Promise(r => setTimeout(r, 80));
+      }
       const bvpCount = Object.keys(bvpCache).length;
       setStep("✅ BvP data fetched — " + bvpCount + " matchup" + (bvpCount !== 1 ? "s" : "") + " with official stats");
 
