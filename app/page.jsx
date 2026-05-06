@@ -913,7 +913,8 @@ async function fetchSavantStats(playerIds) {
    Launch angle sweet spot: 25-35° = 1.1x, outside = penalty */
 function getStatcastMult(avgEV, avgLA) {
   if (!avgEV) return 1.0;
-  const evMult = Math.max(0.7, Math.min(1.55, Math.pow(avgEV / 92.0, 3)));
+  // Softer power curve: 88mph=0.82, 92mph=1.0, 96mph=1.28, 100mph=1.50
+  const evMult = Math.max(0.75, Math.min(1.50, Math.pow(avgEV / 92.0, 2.5)));
   const laMult = (avgLA >= 20 && avgLA <= 38) ? 1.08 : (avgLA >= 15 && avgLA <= 42) ? 1.02 : 0.92;
   return evMult * laMult;
 }
@@ -930,10 +931,11 @@ function runHRSimulation(batter, pitcher, weatherBoost = 0, N = 1000, parkFactor
   // ── Base rate: use HR split vs pitcher hand if available ──
   const splitRate = getHRSplitRate(name, pitcherHand);
   const baseRate = splitRate !== null
-    ? splitRate * 3.8 * 0.5
-    : (hr / Math.max(gp, 20)) * 0.5;
+    ? splitRate * 3.8 * 0.65           // split-based: PA rate → per-game, calibrated
+    : (hr / Math.max(gp, 20)) * 0.65;  // raised from 0.5 → more realistic display range
 
   // ── Statcast: exit velocity + launch angle ──
+  // Softer power curve so elite EV is rewarded but not overwhelming
   const statcastMult = getStatcastMult(batter?.avgEV, batter?.avgLA);
 
   // ── Pitcher: HR/9 preferred over ERA ──
@@ -948,7 +950,7 @@ function runHRSimulation(batter, pitcher, weatherBoost = 0, N = 1000, parkFactor
   const formMult    = getFormMult(name, hr, gp);
   const weatherMult = 1 + (Math.max(-1, Math.min(1, weatherBoost)) * 0.10);
 
-  const hrProb = Math.min(0.34, baseRate * statcastMult * pitcherMult * pf * pull * formMult * weatherMult);
+  const hrProb = Math.min(0.38, baseRate * statcastMult * pitcherMult * pf * pull * formMult * weatherMult);
 
   let hits = 0;
   for (let i = 0; i < N; i++) {
