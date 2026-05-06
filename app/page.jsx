@@ -498,19 +498,25 @@ const BATTER_IDS = {
 };
 
 const KNOWN_2026_HR = {
-  "Aaron Judge":13,"Munetaka Murakami":13,"Yordan Alvarez":12,"Ben Rice":12,
-  "Matt Olson":11,"Mike Trout":9,"Kyle Schwarber":9,"Gunnar Henderson":9,
-  "Pete Alonso":8,"Bryce Harper":8,"Juan Soto":8,"Jordan Walker":8,
-  "Bobby Witt Jr":7,"Vladimir Guerrero Jr":7,"Jose Ramirez":7,"Mookie Betts":7,
-  "Freddie Freeman":7,"Fernando Tatis Jr":7,"Shohei Ohtani":7,"Rafael Devers":7,
-  "Matt Chapman":6,"Elly De La Cruz":6,"Julio Rodriguez":6,"Randy Arozarena":6,
-  "Ian Happ":6,"Jarren Duran":6,"Jackson Chourio":5,"Pete Crow-Armstrong":5,
-  "Alex Bregman":5,"Willy Adames":5,"Byron Buxton":5,"Nolan Arenado":5,
-  "Francisco Lindor":5,"Shea Langeliers":5,"Austin Riley":5,"Manny Machado":5,
-  "Nick Kurtz":4,"James Wood":4,"Vinnie Pasquantino":4,"Salvador Perez":4,
-  "Ketel Marte":4,"Bo Bichette":4,"Riley Greene":4,"William Contreras":4,
-  "Ozzie Albies":4,"Jorge Soler":4,"Spencer Torkelson":4,"Corbin Carroll":3,
-  "Kerry Carpenter":3,"Tyler Stephenson":3,"Jonathan India":3,"Jake Cronenworth":3,
+  // Verified through May 3, 2026 — source: SI.com / MLB.com
+  "Aaron Judge":13, "Munetaka Murakami":13, "Yordan Alvarez":12, "Ben Rice":12,
+  "Matt Olson":11,
+  // Estimated from early-season reports (approx May 3)
+  "Mike Trout":9, "Kyle Schwarber":9, "Gunnar Henderson":9,
+  "Pete Alonso":8, "Bryce Harper":8, "Juan Soto":8, "Jordan Walker":8,
+  "Bobby Witt Jr":7, "Vladimir Guerrero Jr":7, "Jose Ramirez":7, "Mookie Betts":7,
+  "Freddie Freeman":7, "Fernando Tatis Jr":7, "Shohei Ohtani":7, "Rafael Devers":7,
+  "Matt Chapman":6, "Elly De La Cruz":6, "Julio Rodriguez":6, "Randy Arozarena":6,
+  "Ian Happ":6, "Jarren Duran":6, "Jackson Chourio":5, "Pete Crow-Armstrong":5,
+  "Alex Bregman":5, "Willy Adames":5, "Byron Buxton":5, "Nolan Arenado":5,
+  "Francisco Lindor":5, "Shea Langeliers":5, "Austin Riley":5, "Manny Machado":5,
+  "Nick Kurtz":4, "James Wood":4, "Vinnie Pasquantino":4, "Salvador Perez":4,
+  "Ketel Marte":4, "Bo Bichette":4, "Riley Greene":4, "William Contreras":4,
+  "Ozzie Albies":4, "Spencer Torkelson":4, "Corbin Carroll":3, "Kerry Carpenter":3,
+  "Tyler Stephenson":3, "Jonathan India":3, "Jake Cronenworth":3, "Oneil Cruz":3,
+  "Jorge Soler":3, "CJ Abrams":3, "Nathaniel Lowe":3, "Adolis Garcia":3,
+  "Jackson Merrill":3, "Jose Altuve":3, "Yainer Diaz":3, "Jeremy Pena":3,
+  "Zach Neto":3, "Taylor Ward":3, "Christian Walker":3, "Liam Hicks":4,
 };
 
 const PLAYER_TEAMS = {
