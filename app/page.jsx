@@ -545,28 +545,27 @@ async function fetchBvPBatch(batters, pitcherId) {
   return results;
 }
 
-/* Master pre-fetch — sequential to avoid rate limits */
+/* Lightweight pre-fetch — only pitcher data, no heavy roster calls */
 async function prefetchGameData(games) {
   const gameData = {};
   for (const g of games) {
     const key = g.away + g.home;
     try {
-      const [awayHitters, homeHitters, awayPitcher, homePitcher] = await Promise.all([
-        fetchTeamHitters(g.away),
-        fetchTeamHitters(g.home),
+      // Only fetch pitcher stats — skip full roster (too many calls)
+      const [awayPitcher, homePitcher] = await Promise.all([
         fetchPitcherData(g.awayP),
         fetchPitcherData(g.homeP),
       ]);
       gameData[key] = {
         away: g.away, home: g.home,
-        awayHitters, homeHitters,
+        awayHitters: [], homeHitters: [],
         awayPitcher, homePitcher,
         awayBvP: {}, homeBvP: {},
       };
     } catch (_) {
       gameData[key] = null;
     }
-    await new Promise(r => setTimeout(r, 150)); // pause between games
+    await new Promise(r => setTimeout(r, 200));
   }
   return gameData;
 }
@@ -1324,6 +1323,7 @@ export default function App() {
         // Store batch game data for post-processing
         Object.assign(allGameData, batchGameData);
 
+        if (b > 0) await new Promise(r => setTimeout(r, 500)); // pause between batches
         const raw = await callClaude(buildPrompt(batches[b], weatherMap, batchGameData), 2000);
         // Parse plain text format: "BOS@DET: Riley Greene 82, Spencer Torkelson 71, Kerry Carpenter 65"
         const batchResults = [];
@@ -1708,134 +1708,6 @@ export default function App() {
         newResults[key] = { players: cleanPlayers };
       });
 
-      // ── BvP enrichment pass — fetch real BvP for each player/pitcher pair ──
-      setStep("⚔️ Fetching live BvP stats from MLB API...");
-      const bvpFetches = [];
-      Object.values(newResults).forEach(gr => {
-        // Only enrich top 2 players per game to limit API calls
-        (gr.players ?? []).slice(0, 2).forEach(p => {
-          // Stamp pitcher details from ALL_GAMES lookup if not already set
-          if (p.pitcher && (!p.pitcherHand || p.pitcherHand === "undefined")) {
-            const det = pitcherDetailMap[p.pitcher];
-            if (det) {
-              p.pitcherHand = det.hand || "";
-              if (p.pitcherERA == null) p.pitcherERA = det.era;
-            }
-          }
-          // Get batterId from live HR map since mlbId might be null from plain text parser
-          const liveEntry   = liveHRMap[p.name] ?? liveHRMap[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()];
-          const gd3         = allGameData[gr.away + gr.home];
-          const allH        = [...(gd3?.awayHitters||[]), ...(gd3?.homeHitters||[])];
-          const rosterEntry = allH.find(h => h.name === p.name || h.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim() === p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim());
-          // Use hardcoded BATTER_IDS first — most reliable
-          const batterId    = BATTER_IDS[p.name] ?? BATTER_IDS[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()] ?? rosterEntry?.id ?? liveEntry?.id ?? p.mlbId;
-          const pitcherName = p.pitcher || "";
-          const pitcherId   = pitcherIdMap[pitcherName] ?? pitcherIdMap[pitcherName.split(" ").slice(-1)[0]];
-          if (batterId && pitcherId) {
-            const cacheKey = batterId + "_" + pitcherName;
-            bvpFetches.push(
-              fetchBvP(batterId, pitcherId).then(bvp => {
-                if (bvp) {
-                  bvpCache[cacheKey] = bvp;
-                  p.bvpSummary = (bvp.ab||0)+" AB · "+(bvp.avg||".000")+" AVG · "+(bvp.hr||0)+" HR";
-                  p.bvpHR = bvp.hr; p.bvpAB = bvp.ab; p.bvpAVG = bvp.avg;
-                }
-              })
-            );
-          }
-        });
-      });
-      // Sequential BvP fetches to avoid rate limit
-      for (const fetch of bvpFetches) {
-        await fetch;
-        await new Promise(r => setTimeout(r, 80));
-      }
-      const bvpCount = Object.keys(bvpCache).length;
-      setStep("✅ BvP data fetched — " + bvpCount + " matchup" + (bvpCount !== 1 ? "s" : "") + " with official stats");
-
-      // ── GUARANTEED FILL: every game gets exactly 3 players no matter what ──
-      let filledCount = 0;
-      games.forEach(g => {
-        const key = g.away + g.home;
-        const existing = newResults[key]?.players ?? [];
-        if (existing.length >= 3) return;
-
-        const gd  = allGameData[key];
-        const w   = weatherMap[key];
-        const wBoost = w?.fieldBoost ?? 0;
-
-        // Tier 1: Use pre-fetched roster hitters
-        const rosterCandidates = gd ? [
-          ...(gd.awayHitters||[]).map(h => ({...h, isHome:false})),
-          ...(gd.homeHitters||[]).map(h => ({...h, isHome:true})),
-        ].filter(h => h.pos !== "P" && !injuredPlayers.has(h.name))
-         .sort((a,b) => (b.hr??0)-(a.hr??0)) : [];
-
-        // Tier 2: Use KNOWN_2026_HR + PLAYER_TEAMS as last resort
-        const knownCandidates = Object.entries(KNOWN_2026_HR)
-          .filter(([name]) => {
-            const team = PLAYER_TEAMS[name];
-            return team === g.away || team === g.home;
-          })
-          .sort((a,b) => b[1]-a[1])
-          .slice(0, 8)
-          .map(([name, hr]) => {
-            const team = PLAYER_TEAMS[name];
-            return { name, hr, gp:33, ops:"0.800", avg:".260",
-              isHome: team === g.home, team, id: null };
-          });
-
-        const allCandidates = rosterCandidates.length > 0 ? rosterCandidates : knownCandidates;
-        const existingNames = new Set(existing.map(p => p.name.toLowerCase()));
-        const needed = 3 - existing.length;
-
-        const extras = allCandidates
-          .filter(h => !existingNames.has(h.name.toLowerCase()))
-          .slice(0, needed + 3)
-          .map(h => {
-            const pitcherName = h.isHome ? (g.awayP||"") : (g.homeP||"");
-            const pitcher = h.isHome ? gd?.awayPitcher : gd?.homePitcher;
-            const simCount = runHRSimulation(h, pitcher, wBoost, 1000);
-            return {
-              name:          h.name,
-              team:          h.isHome ? g.home : g.away,
-              isHome:        h.isHome,
-              mlbId:         h.id ?? null,
-              seasonHRs:     h.hr ?? 0,
-              gamesPlayed:   h.gp ?? 33,
-              ops:           h.ops ?? ".800",
-              avg:           h.avg ?? ".260",
-              pitcher:       pitcherName,
-              pitcherHand:   pitcherDetailMap[pitcherName]?.hand || "",
-              pitcherERA:    pitcherDetailMap[pitcherName]?.era ?? null,
-              pitcherWhip:   null,
-              hrChancePct:   Math.min(22, Math.max(4, (h.hr ?? 2) * 0.55)),
-              confidence:    62,
-              simHRs:        Math.min(Math.round(simCount), 1000),
-              bvpSummary:    "No BvP data",
-              bvpHR: null, bvpAB: null, bvpAVG: null,
-              weatherInsight: w ? w.tempF+"°F · "+w.windSpeed+"mph "+w.windDir+" ("+(w.windVsField||"?")+")": "",
-            };
-          });
-
-        const merged = [...existing, ...extras]
-          .sort((a,b)=>(b.simHRs??(b.hrChancePct??0)*10)-(a.simHRs??(a.hrChancePct??0)*10))
-          .slice(0,3);
-        newResults[key] = { players: merged };
-        if (merged.length > existing.length) {
-          filledCount++;
-          setStep("📋 Filled " + g.away+"@"+g.home+" → "+merged.length+" players");
-        }
-      });
-
-      // Final guarantee — if still missing, add placeholder so UI doesn't break
-      games.forEach(g => {
-        const key = g.away + g.home;
-        if (!newResults[key] || newResults[key].players.length === 0) {
-          setStep("⚠️ No data for "+g.away+"@"+g.home+" — skipped");
-          newResults[key] = { players: [] };
-        }
-      });
 
       setResults({...newResults}); // trigger re-render with BvP data
       setOpenGames(new Set(games.map(g => g.away + g.home)));
