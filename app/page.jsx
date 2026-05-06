@@ -1,5 +1,20 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+const T = {
+  bg:"#080c14", panel:"#101826", card:"#131f2e", border:"#1e3048",
+  accent:"#00e5ff", gold:"#ffd700", green:"#00e676", red:"#ff5252",
+  amber:"#ffca28", purple:"#ce93d8", teal:"#40e0d0",
+  text:"#f0f6ff", muted:"#7a9abf", dim:"#0e1a28",
+  hotBg:"#1a2e1a", hotBorder:"#00e67655",
+  cardHover:"#162030",
+};
+
+const F = {
+  bebas:"'Bebas Neue',Impact,sans-serif",
+  mono:"'DM Mono','Courier New',monospace",
+  arch:"'Archivo Black','Arial Black',sans-serif",
+};
+
 
 /* ── Assets ── */
 function useAssets() {
@@ -27,20 +42,6 @@ function useAssets() {
     }
   }, []);
 }
-
-const T = {
-  bg:"#080c14", panel:"#101826", card:"#131f2e", border:"#1e3048",
-  accent:"#00e5ff", gold:"#ffd700", green:"#00e676", red:"#ff5252",
-  amber:"#ffca28", purple:"#ce93d8", teal:"#40e0d0",
-  text:"#f0f6ff", muted:"#7a9abf", dim:"#0e1a28",
-  hotBg:"#1a2e1a", hotBorder:"#00e67655",
-  cardHover:"#162030",
-};
-const F = {
-  bebas:"'Bebas Neue',Impact,sans-serif",
-  mono:"'DM Mono','Courier New',monospace",
-  arch:"'Archivo Black','Arial Black',sans-serif",
-};
 
 /* ── All 15 games ── */
 const ALL_GAMES = [
