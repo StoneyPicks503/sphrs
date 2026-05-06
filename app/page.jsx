@@ -578,6 +578,110 @@ async function fetchPitcherIds(pitcherNames) {
 
 /* ── Team ID map for MLB Stats API ── */
 /* ── Park HR factors (based on multi-year HR park factor data) ── */
+/* ── Player HR spray tendencies (pull% / center% / oppo%) ──
+   Source: Baseball Savant spray charts 2024-2026
+   Pull = toward pull-side foul line, Center = middle third, Oppo = opposite field ── */
+const HR_SPRAY = {
+  // name: [pull%, center%, oppo%]
+  "Aaron Judge":          [68, 24,  8],  // massive pull hitter to LF
+  "Shohei Ohtani":        [55, 32, 13],  // balanced with pull tendency
+  "Kyle Schwarber":       [72, 20,  8],  // extreme pull LF
+  "Gunnar Henderson":     [58, 28, 14],
+  "Pete Alonso":          [60, 28, 12],
+  "Yordan Alvarez":       [52, 35, 13],  // uses whole field
+  "Bryce Harper":         [55, 30, 15],
+  "Juan Soto":            [45, 38, 17],  // opposite field power
+  "Matt Olson":           [65, 25, 10],
+  "Bobby Witt Jr":        [54, 32, 14],
+  "Jose Ramirez":         [48, 35, 17],  // switch - balanced
+  "Mookie Betts":         [58, 28, 14],
+  "Freddie Freeman":      [42, 35, 23],  // notorious opposite field power
+  "Munetaka Murakami":    [62, 28, 10],
+  "Mike Trout":           [55, 30, 15],
+  "Rafael Devers":        [68, 22, 10],  // extreme pull
+  "Fernando Tatis Jr":    [56, 30, 14],
+  "Julio Rodriguez":      [50, 35, 15],
+  "Matt Chapman":         [55, 30, 15],
+  "Nolan Arenado":        [58, 28, 14],
+  "Vladimir Guerrero Jr": [52, 35, 13],
+  "Bo Bichette":          [48, 38, 14],
+  "Austin Riley":         [62, 26, 12],
+  "Jackson Chourio":      [54, 30, 16],
+  "Willy Adames":         [60, 28, 12],
+  "Spencer Torkelson":    [64, 24, 12],
+  "Riley Greene":         [55, 30, 15],
+  "Kerry Carpenter":      [58, 28, 14],
+  "Nick Kurtz":           [60, 28, 12],
+  "Ketel Marte":          [50, 35, 15],  // switch
+  "Corbin Carroll":       [52, 32, 16],
+  "Manny Machado":        [55, 30, 15],
+  "Byron Buxton":         [54, 32, 14],
+  "Elly De La Cruz":      [56, 28, 16],  // switch
+  "Ian Happ":             [52, 32, 16],  // switch
+};
+
+/* Stadium wall distances by zone ──
+   [LF_line, LF_power(~22deg), CF(~45deg), RF_power(~22deg), RF_line]
+   All in feet ── */
+const ZONE_DISTANCES = {
+  "Yankee Stadium":      [318, 399, 408, 385, 314],
+  "Fenway Park":         [310, 379, 420, 380, 302],
+  "Wrigley Field":       [355, 368, 400, 368, 353],
+  "Coors Field":         [347, 390, 415, 375, 350],
+  "Oracle Park":         [339, 382, 399, 421, 309],
+  "Petco Park":          [336, 390, 396, 391, 322],
+  "Angel Stadium":       [347, 390, 400, 386, 347],
+  "Kauffman Stadium":    [330, 387, 410, 387, 330],
+  "Busch Stadium":       [336, 375, 400, 375, 335],
+  "Comerica Park":       [345, 370, 422, 379, 330],
+  "PNC Park":            [325, 383, 399, 375, 320],
+  "Great American":      [328, 379, 404, 370, 325],
+  "Nationals Park":      [336, 377, 402, 370, 335],
+  "Target Field":        [339, 377, 404, 367, 328],
+  "Citizens Bank Park":  [329, 374, 401, 369, 330],
+  "Guaranteed Rate":     [330, 375, 400, 375, 335],
+  "Truist Park":         [335, 375, 400, 375, 325],
+  "Sutter Health Park":  [330, 375, 400, 375, 330],
+  "Chase Field":         [330, 374, 407, 374, 334],
+  "Daikin Park":         [315, 362, 409, 373, 326],
+  "loanDepot Park":      [340, 386, 400, 386, 335],
+  "Tropicana Field":     [315, 370, 404, 370, 322],
+  "T-Mobile Park":       [331, 378, 401, 381, 326],
+};
+
+/* Calculate spray-adjusted HR factor for this batter in this stadium
+   Uses batter's spray % weighted against each zone's wall distance
+   Shorter wall in frequently-used zone = higher factor */
+function getSprayFactor(playerName, venue, batterHand) {
+  const spray = HR_SPRAY[playerName] || HR_SPRAY[playerName?.replace(/\s+(Jr|Sr)\.?$/i,"").trim()];
+  const zones = ZONE_DISTANCES[venue];
+  if (!spray || !zones) return 1.0;
+
+  const [pullP, centerP, oppoP] = spray.map(p => p/100);
+  const [lf, lfp, cf, rfp, rf] = zones;
+
+  // Assign zones based on batter hand
+  let pullLine, pullPower, oppoLine, oppoPower;
+  if (batterHand === "L") {
+    pullLine=rf; pullPower=rfp; oppoLine=lf; oppoPower=lfp;
+  } else {
+    pullLine=lf; pullPower=lfp; oppoLine=rf; oppoPower=rfp;
+  }
+
+  // League baseline distances
+  const BASE_LINE=330, BASE_POWER=375, BASE_CF=405;
+
+  // Each foot shorter than baseline = HR boost, deeper = penalty
+  // Scale: 1% per 3ft
+  const pullFactor = (1 + (BASE_LINE-pullLine)/300)*0.35 + (1 + (BASE_POWER-pullPower)/300)*0.65;
+  const cFactor    = 1 + (BASE_CF-cf)/300;
+  const oppoFactor = (1 + (BASE_LINE-oppoLine)/300)*0.35 + (1 + (BASE_POWER-oppoPower)/300)*0.65;
+
+  const raw = pullP*pullFactor + centerP*cFactor + oppoP*oppoFactor;
+  return Math.max(0.88, Math.min(1.20, raw));
+}
+
+
 const PARK_FACTORS = {
   "Coors Field":1.38, "Sutter Health Park":1.28, "Wrigley Field":1.14,
   "Yankee Stadium":1.10, "Fenway Park":1.06, "Great American":1.06,
@@ -1638,7 +1742,11 @@ export default function App() {
             const parkFactor = PARK_FACTORS[gameObj?.venue] || 1.0;
             const scLookup  = STATCAST[p.name] || STATCAST[p.name?.replace(/\s+(Jr|Sr)\.?$/i,"").trim()] || {};
             const bHand     = p.batterHand || BATTER_HANDS[p.name] || "R";
-            const pullFactor = getPullFactor(gameObj?.venue, bHand, p.pitcherHand);
+            // Spray-adjusted factor: player's actual HR zones vs this stadium's wall distances
+            const sprayFactor = getSprayFactor(p.name, gameObj?.venue, bHand);
+            // Platoon factor: same/opp hand matchup effect on pull contact
+            const platoonFactor = (bHand && p.pitcherHand && bHand !== p.pitcherHand) ? 1.06 : 0.97;
+            const pullFactor = Math.max(0.85, Math.min(1.28, sprayFactor * platoonFactor));
             const enrichedBatter = {
               hr: knownHR || 3, gp: 33, name: p.name,
               avgEV: p.avgEV || scLookup.avgEV || null,
