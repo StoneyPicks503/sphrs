@@ -1536,115 +1536,176 @@ function buildPrompt(games, weatherMap={}, gameData={}) {
 
 /* ════════ TOP 3 PARLAY BANNER ════════ */
 function ParlayBanner({ results }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen]   = useState(true);
+  const [slide, setSlide] = useState(0);
+  const touchStartX = useRef(null);
 
-  // Flatten all players across all games, sort by simHRs/hrChancePct
+  // Flatten all players
   const allPlayers = [];
   Object.entries(results).forEach(([key, gr]) => {
-    (gr.players || []).forEach(p => {
-      allPlayers.push({ ...p, gameKey: key });
-    });
+    (gr.players || []).forEach(p => allPlayers.push({ ...p, gameKey: key }));
   });
 
-  // Sort all by sim%, then pick top 3 with no duplicate teams
-  const sorted = [...allPlayers].sort((a, b) => {
-    const aScore = a.simHRs ?? (a.hrChancePct ?? 0) * 10;
-    const bScore = b.simHRs ?? (b.hrChancePct ?? 0) * 10;
-    return bScore - aScore;
-  });
-  const usedTeams = new Set();
-  const top3 = [];
-  for (const p of sorted) {
-    if (top3.length >= 3) break;
-    if (!p.team || usedTeams.has(p.team)) continue;
-    usedTeams.add(p.team);
-    top3.push(p);
+  if (allPlayers.length < 3) return null;
+
+  // Helper: pick top 3 with no duplicate teams from a sorted list
+  function pick3(sorted) {
+    const used = new Set(); const out = [];
+    for (const p of sorted) {
+      if (out.length >= 3) break;
+      if (!p.team || used.has(p.team)) continue;
+      used.add(p.team); out.push(p);
+    }
+    return out;
   }
 
-  if (top3.length < 2) return null;
+  // ── Parlay 1: Best Overall (highest sim%) ──
+  const bySimPct = [...allPlayers].sort((a,b) =>
+    (b.simHRs ?? (b.hrChancePct??0)*10) - (a.simHRs ?? (a.hrChancePct??0)*10));
+  const parlay1 = pick3(bySimPct);
 
-  // Combined parlay probability (multiply individual chances)
-  const combinedPct = top3.reduce((acc, p) => {
-    const pct = p.simHRs != null ? (p.simHRs / 1000) : ((p.hrChancePct ?? 10) / 100);
-    return acc * pct;
+  // ── Parlay 2: Value Parlay (sim% most above Vegas implied) ──
+  const byValue = [...allPlayers]
+    .filter(p => p.vegasProb != null)
+    .sort((a,b) => {
+      const aEdge = ((a.simHRs??0)/10) - (a.vegasProb??0);
+      const bEdge = ((b.simHRs??0)/10) - (b.vegasProb??0);
+      return bEdge - aEdge;
+    });
+  const parlay2 = byValue.length >= 3 ? pick3(byValue) : pick3(bySimPct.slice(3));
+
+  // ── Parlay 3: Power Parlay (highest HR pace vs worst pitchers ERA) ──
+  const byPower = [...allPlayers].sort((a,b) => {
+    const aScore = ((a.seasonHRs??0) * 2) + ((a.pitcherERA??4.20) * 3);
+    const bScore = ((b.seasonHRs??0) * 2) + ((b.pitcherERA??4.20) * 3);
+    return bScore - aScore;
+  });
+  const parlay3 = pick3(byPower);
+
+  const PARLAYS = [
+    { label:"⚡ TOP OVERALL",    sublabel:"Highest sim % picks",         color:T.gold,    players: parlay1 },
+    { label:"💰 VALUE PARLAY",   sublabel:"Sim beats Vegas market",       color:"#00e676", players: parlay2 },
+    { label:"💥 POWER PARLAY",   sublabel:"Best HR pace vs worst pitchers",color:"#ff6b35", players: parlay3 },
+  ];
+
+  const current = PARLAYS[slide];
+  const combinedPct = current.players.reduce((acc, p) => {
+    return acc * (p.simHRs != null ? p.simHRs/1000 : (p.hrChancePct??10)/100);
   }, 1);
-  const combinedDisplay = (combinedPct * 100).toFixed(2);
+
+  const handleTouchStart = e => { touchStartX.current = e.touches[0].clientX; };
+  const handleTouchEnd   = e => {
+    if (touchStartX.current === null) return;
+    const diff = touchStartX.current - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 40) setSlide(s => diff > 0 ? Math.min(2, s+1) : Math.max(0, s-1));
+    touchStartX.current = null;
+  };
 
   return (
     <div style={{
-      background: "linear-gradient(135deg, rgba(0,0,0,0.6), rgba(8,12,20,0.95))",
-      border: "1px solid " + T.gold + "66",
-      borderRadius: 14, marginBottom: 16, overflow: "hidden",
-      boxShadow: "0 0 30px rgba(255,215,0,0.15)",
-    }}>
+      background:"linear-gradient(135deg,rgba(0,0,0,0.6),rgba(8,12,20,0.95))",
+      border:"1px solid "+current.color+"55",
+      borderRadius:14, marginBottom:16, overflow:"hidden",
+      boxShadow:"0 0 30px "+current.color+"20",
+      transition:"border-color .3s, box-shadow .3s",
+    }}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Header */}
-      <div
-        onClick={() => setOpen(v => !v)}
-        style={{
-          padding: "12px 16px", cursor: "pointer",
-          background: "linear-gradient(90deg, rgba(255,215,0,0.12), transparent)",
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-        }}
-      >
-        <div>
-          <div style={{ fontFamily: F.mono, fontSize: 9, letterSpacing: 3, color: T.gold, marginBottom: 2 }}>
-            ⚡ TODAY'S TOP PARLAY
+      <div onClick={() => setOpen(v=>!v)} style={{
+        padding:"12px 16px", cursor:"pointer",
+        background:"linear-gradient(90deg,"+current.color+"18,transparent)",
+        display:"flex", justifyContent:"space-between", alignItems:"center",
+        transition:"background .3s",
+      }}>
+        <div style={{ flex:1 }}>
+          <div style={{ fontFamily:F.mono, fontSize:9, letterSpacing:3, color:current.color, marginBottom:2 }}>
+            {current.label}
           </div>
-          <div style={{ fontFamily: F.arch, fontSize: 15, color: T.text }}>
-            Best 3 HR Picks Combined
+          <div style={{ fontFamily:F.arch, fontSize:14, color:T.text }}>
+            {current.sublabel}
           </div>
         </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontFamily: F.bebas, fontSize: 28, color: T.gold, lineHeight: 1, textShadow: "0 0 20px rgba(255,215,0,0.6)" }}>
-            {combinedDisplay}%
+        <div style={{ textAlign:"right", marginRight:10 }}>
+          <div style={{ fontFamily:F.bebas, fontSize:26, color:current.color, lineHeight:1,
+            textShadow:"0 0 18px "+current.color+"88" }}>
+            {(combinedPct*100).toFixed(2)}%
           </div>
-          <div style={{ fontFamily: F.mono, fontSize: 8, color: T.muted }}>PARLAY PROB</div>
+          <div style={{ fontFamily:F.mono, fontSize:8, color:T.muted }}>COMBINED</div>
         </div>
-        <div style={{ color: T.gold, fontSize: 13, marginLeft: 12, transition: "transform .2s", transform: open ? "rotate(180deg)" : "rotate(0)" }}>▼</div>
+        <div style={{ color:current.color, fontSize:13,
+          transform:open?"rotate(180deg)":"rotate(0)", transition:"transform .2s" }}>▼</div>
+      </div>
+
+      {/* Slide dots */}
+      <div style={{ display:"flex", justifyContent:"center", gap:6, padding:"6px 0 0" }}>
+        {PARLAYS.map((pl, i) => (
+          <div key={i} onClick={() => setSlide(i)} style={{
+            width: i===slide ? 20 : 6, height:6, borderRadius:3,
+            background: i===slide ? pl.color : T.border,
+            cursor:"pointer", transition:"all .25s",
+          }} />
+        ))}
       </div>
 
       {/* Players */}
       {open && (
-        <div style={{ padding: "0 14px 14px" }}>
-          <div style={{ borderTop: "1px solid rgba(255,215,0,0.2)", paddingTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-            {top3.map((p, i) => {
-              const pct = p.simHRs != null
-                ? ((p.simHRs / 1000) * 100).toFixed(1)
-                : (p.hrChancePct ?? 0).toFixed(1);
-              const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉";
-              const c = parseFloat(pct) >= 20 ? "#00e676" : parseFloat(pct) >= 12 ? "#ffca28" : "#ffa726";
+        <div style={{ padding:"8px 14px 14px" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+            <button onClick={() => setSlide(s => Math.max(0,s-1))}
+              style={{ background:"transparent", border:"none", color:slide>0?current.color:T.border,
+                fontSize:18, cursor:slide>0?"pointer":"default", padding:"0 4px" }}>‹</button>
+            <div style={{ fontFamily:F.mono, fontSize:9, color:T.muted, letterSpacing:1 }}>
+              {slide+1} / {PARLAYS.length} · SWIPE TO SWITCH
+            </div>
+            <button onClick={() => setSlide(s => Math.min(2,s+1))}
+              style={{ background:"transparent", border:"none", color:slide<2?current.color:T.border,
+                fontSize:18, cursor:slide<2?"pointer":"default", padding:"0 4px" }}>›</button>
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            {current.players.map((p, i) => {
+              const pct = p.simHRs!=null ? ((p.simHRs/1000)*100).toFixed(1) : (p.hrChancePct??0).toFixed(1);
+              const medal = i===0?"🥇":i===1?"🥈":"🥉";
+              const c2 = parseFloat(pct)>=20?"#00e676":parseFloat(pct)>=12?"#ffca28":"#ffa726";
+              const edge = p.vegasProb ? ((p.simHRs??0)/10 - p.vegasProb).toFixed(1) : null;
               return (
                 <div key={i} style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  background: "rgba(255,215,0,0.05)", border: "1px solid rgba(255,215,0,0.15)",
-                  borderRadius: 9, padding: "8px 12px",
+                  display:"flex", alignItems:"center", gap:10,
+                  background:current.color+"08", border:"1px solid "+current.color+"25",
+                  borderRadius:9, padding:"8px 12px",
                 }}>
-                  <span style={{ fontSize: 18, flexShrink: 0 }}>{medal}</span>
-                  <Headshot mlbId={p.mlbId} name={p.name} size={36} teamColor={p.teamColor || T.gold} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: F.arch, fontSize: 13, color: T.text, marginBottom: 1 }}>
+                  <span style={{ fontSize:16, flexShrink:0 }}>{medal}</span>
+                  <Headshot mlbId={p.mlbId} name={p.name} size={34} teamColor={current.color} />
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontFamily:F.arch, fontSize:13, color:T.text, marginBottom:1,
+                      whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                       {p.name}
                     </div>
-                    <div style={{ fontFamily: F.mono, fontSize: 9, color: T.muted }}>
-                      {p.team} · {p.isHome ? "🏠 HOME" : "✈ AWAY"} · vs {p.pitcher || "TBD"}
+                    <div style={{ fontFamily:F.mono, fontSize:8, color:T.muted }}>
+                      {p.team} · vs {p.pitcher||"TBD"} ERA {p.pitcherERA?parseFloat(p.pitcherERA).toFixed(2):"N/A"}
+                      {edge && parseFloat(edge)>0 && <span style={{ color:"#00e676", marginLeft:4 }}>+{edge}% edge</span>}
                     </div>
                   </div>
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontFamily: F.bebas, fontSize: 22, color: c, lineHeight: 1 }}>{pct}%</div>
-                    <div style={{ fontFamily: F.mono, fontSize: 8, color: T.muted }}>HR CHANCE</div>
+                  <div style={{ textAlign:"right", flexShrink:0 }}>
+                    <div style={{ fontFamily:F.bebas, fontSize:20, color:c2, lineHeight:1 }}>{pct}%</div>
+                    {p.battingPos>0 && <div style={{ fontFamily:F.mono, fontSize:7, color:current.color }}>
+                      BAT {p.battingPos}{["st","nd","rd"][p.battingPos-1]||"th"}
+                    </div>}
                   </div>
                 </div>
               );
             })}
           </div>
-          <div style={{ fontFamily: F.mono, fontSize: 9, color: T.muted, textAlign: "center", marginTop: 10, lineHeight: 1.6 }}>
-            Combined probability if all 3 hit a HR today · For entertainment purposes only
+          <div style={{ fontFamily:F.mono, fontSize:8, color:T.muted, textAlign:"center", marginTop:10 }}>
+            For entertainment only · Swipe or tap arrows to switch parlays
           </div>
         </div>
       )}
     </div>
   );
 }
+
 
 /* ════════ MAIN APP ════════ */
 export default function App() {
