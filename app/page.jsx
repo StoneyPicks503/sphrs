@@ -805,533 +805,278 @@ function HRBar({ pct, color }) {
   );
 }
 
-/* ── Player row inside game accordion ── */
-function PlayerRow({ p, rank, delay = 0 }) {
-  // Use sim result as the single HR% — real math from MLB stats
-  const simPct  = p.simHRs != null ? parseFloat(((p.simHRs / 1000) * 100).toFixed(1)) : null;
-  const hrPct   = simPct ?? p.hrChancePct ?? 0;
-  const c = hrPct >= 20 ? "#00e676" : hrPct >= 12 ? "#ffca28" : hrPct >= 6 ? "#ffa726" : "#7a9abf";
-  const glow = hrPct >= 15 ? "0 0 20px " + c + "88" : "none";
-  const [expanded, setExpanded] = useState(false);
 
-  return (
-    <div style={{
-      animation: "hrs-up .35s ease " + delay + "ms both",
-      background: rank <= 3 ? c + "12" : "rgba(14,26,40,0.7)",
-      border: "1px solid " + (rank <= 3 ? c + "55" : T.border + "aa"),
-      boxShadow: rank === 1 ? "0 0 20px " + c + "22" : "none",
-      borderRadius: 10, marginBottom: 7, overflow: "hidden",
-    }}>
-      {/* Main row */}
-      <div
-        onClick={() => setExpanded(v => !v)}
-        style={{ padding: "10px 12px", cursor: "pointer", display: "flex", gap: 10, alignItems: "center" }}
-      >
-        {/* Rank */}
-        <div style={{
-          width: 22, flexShrink: 0, fontFamily: F.bebas, fontSize: 18,
-          color: rank === 1 ? "#ffd700" : rank === 2 ? "#e8e8e8" : rank === 3 ? "#ffaa44" : T.muted,
-          textAlign: "center",
-        }}>
-          {rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : rank}
-        </div>
-
-        {/* Headshot */}
-        <Headshot mlbId={p.mlbId} name={p.name} size={44} teamColor={p.teamColor || T.accent} />
-
-        {/* Name + team */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
-            <span style={{ fontFamily: F.arch, fontSize: 13, color: T.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {p.name}
-            </span>
-
-          </div>
-          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontFamily: F.mono, fontSize: 9, color: T.muted }}>{p.team}</span>
-            {p.isHome
-              ? <span style={{ fontFamily: F.mono, fontSize: 9, color: T.green }}>🏠 HOME</span>
-              : <span style={{ fontFamily: F.mono, fontSize: 9, color: T.teal }}>✈ AWAY</span>}
-            {p.seasonHRs != null && (
-              <span style={{ fontFamily: F.mono, fontSize: 9, color: T.accent }}>{p.seasonHRs} HR</span>
-            )}
-          </div>
-        </div>
-
-        {/* HR % + sim count + AI score */}
-        <div style={{ textAlign: "right", flexShrink: 0 }}>
-          <div style={{ fontFamily: F.bebas, fontSize: 26, color: c, lineHeight: 1, textShadow: glow }}>
-            {hrPct.toFixed(1)}%
-          </div>
-          <div style={{ fontFamily: F.mono, fontSize: 8, color: T.muted, marginBottom: 2 }}>{simPct != null ? "SIM HR %" : "HR CHANCE"}</div>
-
-        </div>
-
-        {/* Expand arrow */}
-        <div style={{ color: T.muted, fontSize: 12, flexShrink: 0, transition: "transform .2s", transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}>▼</div>
-      </div>
-
-      {/* Expanded detail */}
-      {expanded && (
-        <div style={{ padding: "0 12px 14px 12px", borderTop: "1px solid " + T.border }}>
-          <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 7 }}>
-
-            {/* 1 — 2026 Season HR */}
-            <div style={{ background:"rgba(0,229,255,0.07)", border:"1px solid rgba(0,229,255,0.25)", borderRadius:8, padding:"8px 12px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-              <span style={{ fontFamily:F.mono, fontSize:9, color:T.muted, letterSpacing:1 }}>2026 SEASON <span style={{ color:"#00e676", fontSize:7 }}>● LIVE</span></span>
-              <span style={{ fontFamily:F.arch, fontSize:14, color:T.accent }}>
-                {p.seasonHRs ?? "—"} HR
-                <span style={{ fontFamily:F.mono, fontSize:9, color:T.muted, marginLeft:6 }}>in {p.gamesPlayed ?? "—"}g</span>
-              </span>
-            </div>
-
-            {/* 2 — BvP vs today's pitcher */}
-            <div style={{ background:"rgba(255,202,40,0.07)", border:"1px solid rgba(255,202,40,0.25)", borderRadius:8, padding:"8px 12px" }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: (p.bvpAB > 0 || p.pitcherArsenal?.length > 0) ? 8 : 0 }}>
-                <span style={{ fontFamily:F.mono, fontSize:9, color:T.amber, letterSpacing:1 }}>
-                  vs {(p.pitcher||"Pitcher")} {p.pitcherHand ? "("+p.pitcherHand+")" : ""} ERA {p.pitcherERA != null ? parseFloat(p.pitcherERA).toFixed(2) : "N/A"}
-                  <span style={{ color:"#00e676", fontSize:7, marginLeft:5 }}>● LIVE</span>
-                </span>
-                <span style={{ fontFamily:F.mono, fontSize:11, color:T.text }}>
-                  {(p.bvpAB != null && p.bvpAB > 0)
-                    ? <><span style={{ color:T.amber, fontWeight:700 }}>{p.bvpAVG || ".000"}</span> AVG · <span style={{ color:"#00e676" }}>{p.bvpHR ?? 0} HR</span> · {p.bvpAB} AB</>
-                    : <span style={{ color:T.muted }}>First career matchup</span>}
-                </span>
-              </div>
-
-              {/* Pitch mix */}
-              {p.pitcherArsenal?.length > 0 && (
-                <div>
-                  <div style={{ fontFamily:F.mono, fontSize:8, color:T.muted, letterSpacing:1, marginBottom:5 }}>PITCH MIX</div>
-                  <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
-                    {p.pitcherArsenal.map((pitch, i) => (
-                      <div key={i} style={{ display:"flex", alignItems:"center", gap:8 }}>
-                        <div style={{ fontFamily:F.mono, fontSize:9, color:T.text, width:110, flexShrink:0 }}>{pitch.name}</div>
-                        <div style={{ flex:1, background:"rgba(255,255,255,0.06)", borderRadius:3, height:5, overflow:"hidden" }}>
-                          <div style={{
-                            width: pitch.pct + "%", height:"100%", borderRadius:3,
-                            background: i === 0 ? T.accent : i === 1 ? T.amber : i === 2 ? T.purple : T.muted,
-                          }} />
-                        </div>
-                        <div style={{ fontFamily:F.mono, fontSize:9, color:T.muted, width:28, textAlign:"right", flexShrink:0 }}>{pitch.pct}%</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* 3 — Weather */}
-            {p.weatherInsight && (
-              <div style={{ background:"rgba(0,230,118,0.06)", border:"1px solid rgba(0,230,118,0.2)", borderRadius:8, padding:"8px 12px" }}>
-                <span style={{ fontFamily:F.mono, fontSize:9, color:"#00e676", letterSpacing:1 }}>🌤 WEATHER</span>
-                <div style={{ fontFamily:F.mono, fontSize:10, color:T.muted, marginTop:3, lineHeight:1.5 }}>{p.weatherInsight}</div>
-              </div>
-            )}
-
-            {/* 4 — Sim result */}
-            <div style={{ background:"rgba(0,230,118,0.06)", border:"1px solid rgba(0,230,118,0.2)", borderRadius:8, padding:"8px 12px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-              <span style={{ fontFamily:F.mono, fontSize:9, color:"#00e676", letterSpacing:1 }}>1,000× SIM ● REAL STATS</span>
-              <span style={{ fontFamily:F.bebas, fontSize:22, color:c, textShadow:glow }}>
-                {hrPct.toFixed(1)}%
-                <span style={{ fontFamily:F.mono, fontSize:9, color:T.muted, marginLeft:6 }}>({p.simHRs ?? "—"}/1k)</span>
-              </span>
-            </div>
-
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ── Game accordion card ── */
-function GameCard({ game, result, isOpen, onToggle, onRemove, isRunning }) {
-  const eraDisplay = (era) => era === null || era === undefined ? "N/A" : String(era);
-  const awayHot = (game.awayERA ?? 0) >= 5.5;
-  const homeHot = (game.homeERA ?? 0) >= 5.5;
-  const anyHot  = awayHot || homeHot;
-  const players = result?.players ?? [];
-  const topHR   = players[0]?.simHRs != null ? parseFloat(((players[0].simHRs/1000)*100).toFixed(1)) : (players[0]?.hrChancePct ?? 0);
-
-  return (
-    <div style={{
-      background: T.panel,
-      border: "1px solid " + (anyHot ? T.green + "66" : T.border),
-      boxShadow: anyHot ? "0 0 16px rgba(0,230,118,0.08)" : "none",
-      borderRadius: 12, marginBottom: 8, overflow: "hidden",
-      animation: "hrs-up .3s ease both",
-    }}>
-      {/* Header — always visible */}
-      <div
-        onClick={onToggle}
-        style={{
-          padding: "11px 14px", cursor: "pointer",
-          display: "flex", alignItems: "center", gap: 10,
-          background: isOpen ? "rgba(14,28,42,0.9)" : "rgba(8,18,28,0.5)",
-          userSelect: "none",
-        }}
-      >
-        {/* Teams — stacked top/bottom layout */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Venue + time + badges */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 5 }}>
-            <span style={{ fontFamily: F.mono, fontSize: 9, color: T.muted }}>{game.venue} · {game.time}</span>
-            
-            {result && <span style={{ fontFamily: F.mono, fontSize: 8, color: "#00e676", background:"rgba(0,230,118,0.1)", padding:"1px 6px", borderRadius:4, border:"1px solid rgba(0,230,118,0.3)" }}>✅ analyzed</span>}
-          </div>
-          {game.weather && (
-            <div style={{ fontFamily: F.mono, fontSize: 8, color: game.weather.hrImpact === "positive" ? "#00e676" : game.weather.hrImpact === "negative" ? T.red : T.muted, marginBottom: 3 }}>
-              {game.weather.isOutdoor === false ? "🏠 Indoor dome" : "🌤 " + game.weather.summary}
-            </div>
-          )}
-          {/* Away team row */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-            <span style={{ fontFamily: F.mono, fontSize: 9, color: T.teal, width: 18, flexShrink: 0 }}>✈</span>
-            <span style={{ fontFamily: F.arch, fontSize: 14, color: "#f4f9ff", minWidth: 36 }}>{game.away}</span>
-            <span style={{ fontFamily: F.mono, fontSize: 9, color: awayHot ? "#00e676" : T.muted }}>
-              {game.awayP} · {game.awayH} · ERA {eraDisplay(game.awayERA)}
-              {game.awayWhip ? " · WHIP " + game.awayWhip : ""}
-              
-            </span>
-          </div>
-          {/* Divider */}
-          <div style={{ height: 1, background: T.border + "66", marginLeft: 24, marginBottom: 4 }} />
-          {/* Home team row */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontFamily: F.mono, fontSize: 9, color: T.green, width: 18, flexShrink: 0 }}>🏠</span>
-            <span style={{ fontFamily: F.arch, fontSize: 14, color: "#f4f9ff", minWidth: 36 }}>{game.home}</span>
-            <span style={{ fontFamily: F.mono, fontSize: 9, color: homeHot ? "#00e676" : T.muted }}>
-              {game.homeP} · {game.homeH} · ERA {eraDisplay(game.homeERA)}
-              {game.homeWhip ? " · WHIP " + game.homeWhip : ""}
-              
-            </span>
-          </div>
-        </div>
-
-        {/* Top HR % badge if analyzed */}
-        {result && players[0] && (
-          <div style={{ textAlign: "center", flexShrink: 0 }}>
-            <div style={{ fontFamily: F.bebas, fontSize: 22, color: "#ffd700", lineHeight: 1, textShadow: "0 0 14px rgba(255,215,0,0.7)" }}>{topHR.toFixed(0)}%</div>
-            <div style={{ fontFamily: F.mono, fontSize: 7, color: T.muted }}>TOP HR</div>
-          </div>
-        )}
-
-        {/* Toggle chevron only */}
-        <div style={{
-          color: T.accent, fontSize: 13, transition: "transform .25s",
-          transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-          flexShrink: 0, padding: "4px 6px",
-        }}>▼</div>
-      </div>
-
-      {/* Expanded content */}
-      {isOpen && (
-        <div style={{ padding: "10px 12px 12px", borderTop: "1px solid " + T.border }}>
-          {/* Stadium wind view — shows real wind direction on field */}
-          {!isRunning && game.weather && <StadiumWindView game={game} weather={game.weather} />}
-          {isRunning && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 0", fontFamily: F.mono, fontSize: 11, color: T.accent, animation: "hrs-blink 1.4s ease infinite" }}>
-              <Spin size={12} /> Analyzing matchups...
-            </div>
-          )}
-          {!isRunning && !result && (
-            <div style={{ fontFamily: F.mono, fontSize: 10, color: T.muted, padding: "10px 0", textAlign: "center" }}>
-              Hit ▶ RUN ANALYSIS to see player HR chances
-            </div>
-          )}
-          {!isRunning && result && players.length > 0 && (
-            <>
-              <div style={{ fontFamily: F.mono, fontSize: 8, letterSpacing: 2, color: T.muted, marginBottom: 8 }}>
-                TOP HR CANDIDATES — {game.away}@{game.home}
-              </div>
-              {players.map((p, i) => (
-                <PlayerRow key={p.name + i} p={p} rank={i + 1} delay={i * 60} />
-              ))}
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ── Spinner ── */
+/* ── Spin indicator ── */
 function Spin({ size = 18, color = T.accent }) {
-  return <div style={{ width:size, height:size, flexShrink:0, border:"2px solid "+color+"25", borderTopColor:color, borderRadius:"50%", animation:"hrs-spin .75s linear infinite", display:"inline-block" }} />;
+  return (
+    <div style={{ width:size, height:size, border:"2px solid "+color+"40",
+      borderTop:"2px solid "+color, borderRadius:"50%",
+      animation:"hrs-spin 0.8s linear infinite", flexShrink:0 }} />
+  );
 }
 
+/* ── Log line ── */
 function LogLine({ text, active }) {
-  return <div style={{ display:"flex", alignItems:"center", gap:8, fontFamily:F.mono, fontSize:11, color:active?T.accent:T.muted, animation:active?"hrs-blink 1.4s ease infinite":"none", marginBottom:3 }}>
-    {active && <Spin size={10} />}{text}
-  </div>;
+  return (
+    <div style={{ fontFamily:F.mono, fontSize:10,
+      color:active?T.accent:T.muted, padding:"2px 0",
+      borderLeft:active?"2px solid "+T.accent:"2px solid transparent",
+      paddingLeft:8, transition:"color 0.3s" }}>
+      {text}
+    </div>
+  );
 }
 
 /* ── Rate limit screen ── */
 function RateLimitScreen({ error, onDismiss }) {
   const [timeLeft, setTimeLeft] = useState("");
   useEffect(() => {
-    if (!error?.resetsAt) return;
     const tick = () => {
+      if (!error?.resetsAt) return;
       const diff = error.resetsAt * 1000 - Date.now();
-      if (diff <= 0) { setTimeLeft("now — try again!"); return; }
-      setTimeLeft(Math.floor(diff / 60000) + "m " + Math.floor((diff % 60000) / 1000) + "s");
+      if (diff <= 0) { setTimeLeft("now"); return; }
+      setTimeLeft(Math.floor(diff/60000)+"m "+Math.floor((diff%60000)/1000)+"s");
     };
-    tick(); const iv = setInterval(tick, 1000); return () => clearInterval(iv);
-  }, [error?.resetsAt]);
+    tick();
+    const iv = setInterval(tick, 1000);
+    return () => clearInterval(iv);
+  }, [error]);
   return (
-    <div style={{ background:"#0d0a00", border:"1px solid "+T.amber+"55", borderRadius:14, padding:"28px 22px", textAlign:"center" }}>
-      <div style={{ fontSize:38, marginBottom:10 }}>⏳</div>
-      <div style={{ fontFamily:F.arch, fontSize:17, color:T.amber, marginBottom:8 }}>API Rate Limit Reached</div>
-      <div style={{ fontFamily:F.mono, fontSize:11, color:T.muted, lineHeight:1.8, marginBottom:18 }}>
-        5-hour limit hit. 7-day window is fine.<br/>
-        {error?.resetsAt ? <>Resets in: <span style={{ color:T.amber, fontWeight:700 }}>{timeLeft}</span></> : "Resets shortly."}
+    <div style={{ background:T.panel, border:"1px solid "+T.amber+"60",
+      borderRadius:13, padding:"28px 20px", textAlign:"center", marginBottom:14 }}>
+      <div style={{ fontSize:36, marginBottom:8 }}>⏳</div>
+      <div style={{ fontFamily:F.arch, fontSize:15, color:T.amber, marginBottom:6 }}>Rate Limit Reached</div>
+      <div style={{ fontFamily:F.mono, fontSize:11, color:T.muted, marginBottom:18 }}>
+        Resets in <span style={{ color:T.amber }}>{timeLeft||"soon"}</span>
       </div>
-      <button onClick={onDismiss} style={{ background:T.amber, color:T.bg, border:"none", borderRadius:9, padding:"10px 26px", fontFamily:F.arch, fontSize:13, cursor:"pointer" }}>Got It</button>
+      <button onClick={onDismiss} style={{ background:T.amber, color:T.bg, border:"none",
+        borderRadius:9, padding:"10px 24px", fontFamily:F.arch, fontSize:13, cursor:"pointer" }}>
+        Got it
+      </button>
+    </div>
+  );
+}
+
+/* ── Player row ── */
+function PlayerRow({ p, rank, delay=0, game }) {
+  const simPct  = p.simHRs != null ? parseFloat(((p.simHRs/1000)*100).toFixed(1)) : null;
+  const hrPct   = simPct ?? p.hrChancePct ?? 0;
+  const c = hrPct>=20?"#00e676":hrPct>=12?"#ffca28":hrPct>=6?"#ffa726":"#7a9abf";
+  const glow = hrPct>=15?"0 0 20px "+c+"88":"none";
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div style={{ background:T.card, border:"1px solid "+T.border, borderRadius:11,
+      marginBottom:8, overflow:"hidden", animation:"hrs-up 0.4s ease both",
+      animationDelay:delay+"ms", cursor:"pointer" }}
+      onClick={() => setExpanded(v=>!v)}>
+      <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px" }}>
+        <div style={{ fontFamily:F.mono, fontSize:10, color:T.muted, width:16, textAlign:"center", flexShrink:0 }}>
+          {rank===1?"🥇":rank===2?"🥈":rank===3?"🥉":rank}
+        </div>
+        <Headshot mlbId={p.mlbId} name={p.name} size={40} teamColor={p.teamColor||c} />
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontFamily:F.arch, fontSize:13, color:T.text, marginBottom:2,
+            whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{p.name}</div>
+          <div style={{ display:"flex", gap:5, flexWrap:"wrap" }}>
+            <span style={{ fontFamily:F.mono, fontSize:9, color:T.muted }}>{p.team}</span>
+            {p.isHome
+              ? <span style={{ fontFamily:F.mono, fontSize:9, color:"#00e676" }}>🏠 HOME</span>
+              : <span style={{ fontFamily:F.mono, fontSize:9, color:"#40e0d0" }}>✈ AWAY</span>}
+          </div>
+        </div>
+        <div style={{ textAlign:"right", flexShrink:0 }}>
+          <div style={{ fontFamily:F.bebas, fontSize:26, color:c, lineHeight:1, textShadow:glow }}>
+            {hrPct.toFixed(1)}%
+          </div>
+          <div style={{ fontFamily:F.mono, fontSize:8, color:T.muted, marginBottom:2 }}>
+            {simPct!=null?"SIM HR %":"HR CHANCE"}
+          </div>
+          {p.simHRs!=null && (
+            <div style={{ fontFamily:F.mono, fontSize:8, color:c, background:c+"15",
+              border:"1px solid "+c+"30", borderRadius:4, padding:"2px 6px", textAlign:"center" }}>
+              {p.simHRs.toLocaleString()}<span style={{ color:T.muted }}>/1k</span>
+            </div>
+          )}
+        </div>
+        <div style={{ color:T.muted, fontSize:10, flexShrink:0,
+          transform:expanded?"rotate(180deg)":"rotate(0)", transition:"transform .2s" }}>▼</div>
+      </div>
+      {expanded && (
+        <div style={{ padding:"0 12px 14px 12px", borderTop:"1px solid "+T.border }}>
+          <div style={{ marginTop:10, display:"flex", flexDirection:"column", gap:7 }}>
+            <div style={{ background:"rgba(0,229,255,0.07)", border:"1px solid rgba(0,229,255,0.25)",
+              borderRadius:8, padding:"8px 12px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <span style={{ fontFamily:F.mono, fontSize:9, color:T.muted, letterSpacing:1 }}>
+                2026 SEASON <span style={{ color:"#00e676", fontSize:7 }}>● LIVE</span>
+              </span>
+              <span style={{ fontFamily:F.arch, fontSize:14, color:"#00e5ff" }}>
+                {p.seasonHRs??"—"} HR
+                <span style={{ fontFamily:F.mono, fontSize:9, color:T.muted, marginLeft:6 }}>in {p.gamesPlayed??"—"}g</span>
+              </span>
+            </div>
+            <div style={{ background:"rgba(255,202,40,0.07)", border:"1px solid rgba(255,202,40,0.25)",
+              borderRadius:8, padding:"8px 12px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
+                marginBottom:(p.bvpAB>0||p.pitcherArsenal?.length>0)?8:0 }}>
+                <span style={{ fontFamily:F.mono, fontSize:9, color:"#ffca28", letterSpacing:1 }}>
+                  vs {p.pitcher||"Pitcher"} {p.pitcherHand?"("+p.pitcherHand+")":""} ERA {p.pitcherERA!=null?parseFloat(p.pitcherERA).toFixed(2):"N/A"}
+                  <span style={{ color:"#00e676", fontSize:7, marginLeft:5 }}>● LIVE</span>
+                </span>
+                <span style={{ fontFamily:F.mono, fontSize:11, color:"#f0f6ff" }}>
+                  {(p.bvpAB!=null&&p.bvpAB>0)
+                    ? <><span style={{ color:"#ffca28", fontWeight:700 }}>{p.bvpAVG||".000"}</span> AVG · <span style={{ color:"#00e676" }}>{p.bvpHR??0} HR</span> · {p.bvpAB} AB</>
+                    : <span style={{ color:"#7a9abf" }}>First career matchup</span>}
+                </span>
+              </div>
+              {p.pitcherArsenal?.length>0 && (
+                <div>
+                  <div style={{ fontFamily:F.mono, fontSize:8, color:"#7a9abf", letterSpacing:1, marginBottom:5 }}>PITCH MIX</div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+                    {p.pitcherArsenal.map((pitch,i)=>(
+                      <div key={i} style={{ display:"flex", alignItems:"center", gap:8 }}>
+                        <div style={{ fontFamily:F.mono, fontSize:9, color:"#f0f6ff", width:110, flexShrink:0 }}>{pitch.name}</div>
+                        <div style={{ flex:1, background:"rgba(255,255,255,0.06)", borderRadius:3, height:5, overflow:"hidden" }}>
+                          <div style={{ width:pitch.pct+"%", height:"100%", borderRadius:3,
+                            background:i===0?"#00e5ff":i===1?"#ffca28":i===2?"#ce93d8":"#7a9abf" }} />
+                        </div>
+                        <div style={{ fontFamily:F.mono, fontSize:9, color:"#7a9abf", width:28, textAlign:"right" }}>{pitch.pct}%</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            {p.weatherInsight && (
+              <div style={{ background:"rgba(0,230,118,0.06)", border:"1px solid rgba(0,230,118,0.2)",
+                borderRadius:8, padding:"8px 12px" }}>
+                <span style={{ fontFamily:F.mono, fontSize:9, color:"#00e676", letterSpacing:1 }}>🌤 WEATHER</span>
+                <div style={{ fontFamily:F.mono, fontSize:10, color:"#7a9abf", marginTop:3, lineHeight:1.5 }}>{p.weatherInsight}</div>
+              </div>
+            )}
+            <div style={{ background:"rgba(0,230,118,0.06)", border:"1px solid rgba(0,230,118,0.2)",
+              borderRadius:8, padding:"8px 12px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <span style={{ fontFamily:F.mono, fontSize:9, color:"#00e676", letterSpacing:1 }}>1,000× SIM ● REAL STATS</span>
+              <span style={{ fontFamily:F.bebas, fontSize:22, color:c, textShadow:glow }}>
+                {hrPct.toFixed(1)}%
+                <span style={{ fontFamily:F.mono, fontSize:9, color:"#7a9abf", marginLeft:6 }}>({p.simHRs??"—"}/1k)</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Game card ── */
+function GameCard({ game, result, isOpen, onToggle, isRunning }) {
+  const players = result?.players ?? [];
+  const awayHot = (game.awayERA??0) >= 5.5;
+  const homeHot = (game.homeERA??0) >= 5.5;
+  const topHR = players[0]?.simHRs!=null
+    ? parseFloat(((players[0].simHRs/1000)*100).toFixed(1))
+    : (players[0]?.hrChancePct??0);
+  const eraStr = v => v==null?"N/A":String(v);
+  return (
+    <div style={{ background:"#101826", border:"1px solid #1e3048", borderRadius:13, marginBottom:10, overflow:"hidden" }}>
+      <div onClick={onToggle} style={{ padding:"12px 14px", cursor:"pointer",
+        background:isOpen?"rgba(0,229,255,0.04)":"transparent" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <span style={{ fontFamily:F.arch, fontSize:14, color:"#f0f6ff" }}>{game.away}</span>
+            <span style={{ fontFamily:F.mono, fontSize:10, color:"#7a9abf" }}>@</span>
+            <span style={{ fontFamily:F.arch, fontSize:14, color:"#f0f6ff" }}>{game.home}</span>
+            {players.length>0 && (
+              <span style={{ fontFamily:F.bebas, fontSize:16, color:"#00e676",
+                background:"rgba(0,230,118,0.1)", border:"1px solid rgba(0,230,118,0.3)",
+                borderRadius:6, padding:"0 7px", marginLeft:4 }}>
+                {topHR.toFixed(1)}%
+              </span>
+            )}
+          </div>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            {result && <span style={{ fontFamily:F.mono, fontSize:8, color:"#00e676",
+              background:"rgba(0,230,118,0.1)", padding:"1px 6px", borderRadius:4,
+              border:"1px solid rgba(0,230,118,0.3)" }}>✅ done</span>}
+            <span style={{ color:"#7a9abf", fontSize:11,
+              transform:isOpen?"rotate(180deg)":"rotate(0)", transition:"transform .2s" }}>▼</span>
+          </div>
+        </div>
+        <div style={{ fontFamily:F.mono, fontSize:9, color:"#7a9abf", marginBottom:4 }}>
+          {game.venue} · {game.time}
+        </div>
+        {game.weather && (
+          <div style={{ fontFamily:F.mono, fontSize:8, marginBottom:3,
+            color:game.weather.hrImpact==="positive"?"#00e676":game.weather.hrImpact==="negative"?"#ff5252":"#7a9abf" }}>
+            {game.weather.isOutdoor===false?"🏠 Dome — climate controlled"
+             :"🌤 "+game.weather.tempF+"°F · "+game.weather.windSpeed+"mph "+game.weather.windDir
+               +" ("+( game.weather.windVsField||"?")+")"
+               +(game.weather.hrImpact==="positive"?" ✅ HR BOOST":game.weather.hrImpact==="negative"?" 🛑 SUPPRESSED":"")}
+          </div>
+        )}
+        <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+          <span style={{ fontFamily:F.mono, fontSize:9, color:awayHot?"#ff6b35":"#7a9abf" }}>
+            {game.away}: {game.awayP} ({game.awayH}) ERA {eraStr(game.awayERA)}
+          </span>
+          <span style={{ color:"#1e3048" }}>|</span>
+          <span style={{ fontFamily:F.mono, fontSize:9, color:homeHot?"#ff6b35":"#7a9abf" }}>
+            {game.home}: {game.homeP} ({game.homeH}) ERA {eraStr(game.homeERA)}
+          </span>
+        </div>
+      </div>
+      {isOpen && (
+        <div style={{ padding:"10px 12px 12px", borderTop:"1px solid #1e3048" }}>
+          {isRunning ? (
+            <div style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 0", color:"#7a9abf" }}>
+              <Spin size={14} />
+              <span style={{ fontFamily:F.mono, fontSize:10 }}>Analyzing matchups...</span>
+            </div>
+          ) : players.length>0 ? (
+            players.map((p,i) => (
+              <PlayerRow key={p.name+i} p={p} rank={i+1} delay={i*80} game={game} />
+            ))
+          ) : (
+            <div style={{ fontFamily:F.mono, fontSize:10, color:"#7a9abf", padding:"8px 0", textAlign:"center" }}>
+              No picks yet — run analysis above
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
 /* ── Prompt builder ── */
-function buildPrompt(games, weatherMap = {}, gameData = {}) {
-  const eraStr = e => e === null || e === undefined ? "N/A" : String(e);
+function buildPrompt(games, weatherMap={}, gameData={}) {
   const lines = games.map(g =>
-    g.away + "@" + g.home + " | " + g.venue + " | " + g.city + " " + g.st + " | " + g.time +
-    " | Away SP: " + g.awayP + " " + g.awayH + " ERA " + eraStr(g.awayERA) + " " + g.awayRec +
-    " | Home SP: " + g.homeP + " " + g.homeH + " ERA " + eraStr(g.homeERA) + " " + g.homeRec
-  ).join("\n");
-
+    g.away+"@"+g.home+" "+g.venue+" "+g.time+
+    " | Away:"+g.awayP+" "+g.awayH+" ERA "+(g.awayERA||"?")+
+    " | Home:"+g.homeP+" "+g.homeH+" ERA "+(g.homeERA||"?")
+  );
   return [
-    "You are an MLB HR analyst. Today is May 5 2026.",
-    "",
-    "KNOWN 2026 ROSTER MOVES: Pete Alonso=BAL, Juan Soto=NYM, Max Fried=NYY, Aaron Judge=NYY,",
+    "You are an MLB HR analyst. Today is May 2026.",
+    "KNOWN 2026 MOVES: Pete Alonso=BAL, Juan Soto=NYM, Aaron Judge=NYY,",
     "Shohei Ohtani=LAD, Yordan Alvarez=HOU, Rafael Devers=SF, Willy Adames=SF,",
-    "Alex Bregman=BOS, Randy Arozarena=SEA, Paul Goldschmidt=NYY, Cody Bellinger=NYY,",
-    "Munetaka Murakami=CWS, Fernando Tatis Jr=SD, Ben Rice=NYY.",
+    "Alex Bregman=BOS, Randy Arozarena=SEA, Paul Goldschmidt=NYY, Munetaka Murakami=CWS.",
     "",
-    "REAL BATTER STATS (MLB API):",
+    "BATTER STATS (MLB API):",
     ...games.map(g => {
-      const key = g.away + g.home;
-      const w   = weatherMap[key];
-      const gd  = gameData[key];
-      const wStr = w ? w.tempF+"F "+w.windSpeed+"mph "+w.windDir+"("+( w.windVsField||"?")+")"+(w.hrImpact==="positive"?" HR+":w.hrImpact==="negative"?" HR-":"") : "";
-      const fmtH = (hitters, bvpMap) => (hitters||[]).slice(0,5).map(h =>
-        h.name+" "+h.hr+"HR "+h.avg+(bvpMap[h.name]?" bvp:"+bvpMap[h.name].hr+"HR/"+bvpMap[h.name].ab+"AB":"")
-      ).join(", ");
-      return g.away+"@"+g.home+": "+g.awayP+" ERA "+(g.awayERA||"?")+" vs "+g.homeP+" ERA "+(g.homeERA||"?")
-        +(wStr?" weather:"+wStr:"")
-        +(gd?" | "+g.away+": "+fmtH(gd.awayHitters,gd.awayBvP||{})+" | "+g.home+": "+fmtH(gd.homeHitters,gd.homeBvP||{}):"");
+      const key=g.away+g.home, w=weatherMap[key], gd=gameData[key];
+      const wStr=w?w.tempF+"F "+w.windSpeed+"mph "+(w.windVsField||"")+(w.hrImpact==="positive"?" HR+":w.hrImpact==="negative"?" HR-":""):"";
+      const fmt=(h,bvp)=>(h||[]).slice(0,5).map(x=>x.name+" "+x.hr+"HR "+x.avg+(bvp[x.name]?" bvp:"+bvp[x.name].hr+"HR/"+bvp[x.name].ab+"AB":"")).join(", ");
+      return g.away+"@"+g.home+": "+g.awayP+" ERA "+(g.awayERA||"?")+" vs "+g.homeP+" ERA "+(g.homeERA||"?")+
+        (wStr?" w:"+wStr:"")+
+        (gd?" | "+g.away+":"+fmt(gd.awayHitters,gd.awayBvP||{})+" | "+g.home+":"+fmt(gd.homeHitters,gd.homeBvP||{}):"");
     }),
-    "",
-    "GAMES:",
-    ...games.map(g => g.away+"@"+g.home+" "+g.venue+" "+g.time),
-    "",
-    "TASK: For each game pick the TOP 6 HR candidates (position players only, no pitchers, no IL players).",
-    "Reply in EXACTLY this format, one game per line, nothing else:",
-    "",
-    "BOS@DET: Riley Greene 82, Spencer Torkelson 71, Kerry Carpenter 65",
-    "NYY@TEX: Aaron Judge 90, Jazz Chisholm 72, Anthony Volpe 61",
-    "",
-    "Format: AWAY@HOME: Player1 SCORE, Player2 SCORE, Player3 SCORE, Player4 SCORE, Player5 SCORE, Player6 SCORE",
-    "SCORE = confidence 0-100. Give 6 players per game line.",
-    "Mix both teams — pick the best HR spots regardless of home/away.",
-    "Example: BOS@DET: Riley Greene 85, Spencer Torkelson 74, Jarren Duran 72, Kerry Carpenter 68, Alex Bregman 61, Masataka Yoshida 55",
-    "ONLY position players (outfielders, infielders, catchers, DH). NO pitchers ever.",
-    "ONLY players on the two teams listed. NO extra text, NO explanations, NO numbering.",
-    "If unsure who plays for a team, pick their known star hitters.",
+    "","GAMES:",...lines,"",
+    "TASK: Pick TOP 6 HR candidates per game. Position players only, no pitchers, no IL players.",
+    "Reply ONE line per game EXACTLY like this:",
+    "BOS@DET: Riley Greene 85, Spencer Torkelson 74, Kerry Carpenter 68, Jarren Duran 65, Alex Bregman 61, Triston Casas 55",
+    "AWAY@HOME: Name Score, Name Score, Name Score, Name Score, Name Score, Name Score",
+    "6 per line. No extra text. No pitchers. Only players on those two teams.",
   ].join("\n");
 }
 
-
-
-/* ════════ STADIUM WIND VIEW ════════ */
-function StadiumWindView({ game, weather }) {
-  if (!weather || weather.dome) return null;
-
-  const coords    = STADIUM_COORDS[game.venue];
-  const cfBearing = coords?.cfBearing ?? 0;
-
-  // Outfield wall paths — polar coords (angle°, ft) → scaled SVG
-  // angle: 0=LF line, 90=CF, 180=RF line; scale 0.185
-  const scale = 0.185;
-  function polar(angleDeg, ft) {
-    const r = (angleDeg - 90) * Math.PI / 180;
-    return [parseFloat((Math.sin(r) * ft * scale).toFixed(1)),
-            parseFloat((-Math.cos(r) * ft * scale).toFixed(1))];
-  }
-
-  const WALLS = {
-    "Yankee Stadium":    [[0,318],[20,399],[45,408],[67,408],[90,408],[113,385],[135,385],[157,314],[180,314]],
-    "Fenway Park":       [[0,310],[18,355],[35,379],[90,420],[140,380],[162,302],[180,302]],
-    "Wrigley Field":     [[0,355],[30,368],[60,400],[90,400],[120,368],[150,353],[180,353]],
-    "Coors Field":       [[0,347],[30,390],[60,415],[90,415],[120,375],[150,350],[180,350]],
-    "Oracle Park":       [[0,339],[25,382],[50,404],[90,399],[120,421],[155,309],[180,309]],
-    "Petco Park":        [[0,336],[30,390],[60,411],[90,396],[120,391],[155,322],[180,322]],
-    "Angel Stadium":     [[0,347],[30,390],[60,400],[90,400],[120,386],[150,350],[180,347]],
-    "Kauffman Stadium":  [[0,330],[30,387],[60,410],[90,410],[120,387],[150,330],[180,330]],
-    "Busch Stadium":     [[0,336],[30,375],[60,400],[90,400],[120,375],[150,335],[180,335]],
-    "Comerica Park":     [[0,345],[25,370],[48,370],[70,422],[90,422],[120,379],[150,330],[180,330]],
-    "PNC Park":          [[0,325],[22,383],[50,410],[90,399],[120,375],[155,320],[180,320]],
-    "Great American":    [[0,328],[30,379],[60,404],[90,404],[120,370],[150,325],[180,325]],
-    "Nationals Park":    [[0,336],[30,377],[60,402],[90,402],[120,370],[150,335],[180,336]],
-    "Target Field":      [[0,339],[22,377],[50,404],[90,404],[120,367],[158,328],[180,328]],
-    "Citizens Bank Park":[[0,329],[30,374],[60,401],[90,401],[120,369],[150,330],[180,330]],
-    "Guaranteed Rate":   [[0,330],[30,375],[60,400],[90,400],[120,375],[150,335],[180,335]],
-    "Truist Park":       [[0,335],[30,375],[60,400],[90,400],[120,375],[150,325],[180,325]],
-    "Sutter Health Park":[[0,330],[30,375],[60,400],[90,400],[120,375],[150,330],[180,330]],
-    "Chase Field":       [[0,330],[30,374],[60,407],[90,407],[120,374],[150,334],[180,334]],
-  };
-
-  const wallPts = WALLS[game.venue] || WALLS["Kauffman Stadium"];
-  const SVG_W = 220, SVG_H = 200;
-  const cx = SVG_W / 2, cy = SVG_H / 2 + 18;  // HP area
-
-  // Build wall path string (relative to origin, then translate)
-  const wallCoords = wallPts.map(([a, d]) => polar(a, d));
-  const wallPath = wallCoords.map(([x,y], i) =>
-    (i === 0 ? "M" : "L") + (cx+x) + "," + (cy+y)
-  ).join(" ") + " Z";
-
-  // Warning track (scale inward by ~30ft)
-  const trackCoords = wallPts.map(([a, d]) => polar(a, Math.max(d - 30, d * 0.92)));
-  const trackPath = trackCoords.map(([x,y], i) =>
-    (i === 0 ? "M" : "L") + (cx+x) + "," + (cy+y)
-  ).join(" ") + " Z";
-
-  // Wind math — where wind is going (arrow direction)
-  const windFrom = typeof weather.windDeg === "number" ? weather.windDeg : 0;
-  const windTo   = (windFrom + 180) % 360;
-  // Wind direction on screen (field rotated so CF faces up)
-  const screenAngle = (windTo - cfBearing - 90) * Math.PI / 180;
-  const wdx = Math.cos(screenAngle);
-  const wdy = Math.sin(screenAngle);
-
-  const wColor = weather.hrImpact === "positive" ? "#ff6a00"
-               : weather.hrImpact === "negative" ? "#5ab4ff"
-               : "#8899aa";
-
-  // Scatter wind arrows across field (like reference image)
-  const arrowPositions = [
-    [0, -52], [-28, -38], [28, -38],
-    [-45, -18], [45, -18],
-    [-30, 5],  [30, 5],
-    [0, -22], [-15, -58], [15, -58],
-    [-52, -5], [52, -5],
-  ];
-  const aLen = weather.windSpeed <= 2 ? 6 : Math.min(14, 6 + weather.windSpeed * 0.5);
-  const markerId = "wm-" + game.away + game.home;
-
-  // Infield
-  const ifR = 26;
-  const hp = [cx, cy + 8];
-  const first  = [cx + ifR * 0.7, cy + 8 - ifR * 0.7];
-  const second = [cx, cy + 8 - ifR * 1.4];
-  const third  = [cx - ifR * 0.7, cy + 8 - ifR * 0.7];
-
-  const fieldRotation = -cfBearing;
-
-  return (
-    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", padding:"6px 0 2px" }}>
-      <div style={{ fontFamily:F.mono, fontSize:7, letterSpacing:3, color:"#3a4a5a", marginBottom:3 }}>
-        WIND FIELD · {game.venue.toUpperCase()}
-      </div>
-
-      <svg width={SVG_W} height={SVG_H} style={{ overflow:"visible" }}>
-        <defs>
-          <marker id={markerId} markerWidth="5" markerHeight="5" refX="4" refY="1.5" orient="auto">
-            <path d="M0,0 L0,3 L5,1.5 z" fill={wColor} />
-          </marker>
-        </defs>
-
-        {/* Rotate entire field to match cfBearing */}
-        <g transform={`rotate(${fieldRotation},${cx},${cy})`}>
-
-          {/* Outfield wall — orange outline like reference */}
-          <path d={wallPath} fill="#0d1f0d" stroke={wColor} strokeWidth="2" opacity="0.9" />
-
-          {/* Warning track */}
-          <path d={trackPath} fill="#2a1a08" stroke="#3a2a10" strokeWidth="0" />
-
-          {/* Outfield grass */}
-          <path d={trackPath} fill="#0f2a0f" />
-
-          {/* Infield dirt */}
-          <polygon
-            points={`${hp[0]},${hp[1]} ${first[0]},${first[1]} ${second[0]},${second[1]} ${third[0]},${third[1]}`}
-            fill="#3a1f08" stroke="#2a1505" strokeWidth="1"
-          />
-
-          {/* Infield grass circle */}
-          <circle cx={cx} cy={cy - 10} r={19} fill="#0f2a0f" />
-
-          {/* Pitching rubber */}
-          <rect x={cx-3} y={cy-16} width={6} height={2.5} fill="#c8b878" rx={0.5} />
-
-          {/* Bases */}
-          {[hp, first, second, third].map(([bx,by], i) => (
-            <rect key={i} x={bx-3} y={by-3} width={6} height={6}
-              fill={i===0?"#c8b878":"white"} rx={0.5} opacity={0.9} />
-          ))}
-
-          {/* Foul lines */}
-          <line x1={hp[0]} y1={hp[1]} x2={cx-70} y2={cy-45}
-            stroke="#c8b878" strokeWidth="0.8" opacity="0.35" strokeDasharray="3,4" />
-          <line x1={hp[0]} y1={hp[1]} x2={cx+70} y2={cy-45}
-            stroke="#c8b878" strokeWidth="0.8" opacity="0.35" strokeDasharray="3,4" />
-
-          {/* Scattered wind arrows across field */}
-          {weather.windSpeed > 1 && arrowPositions.map(([ox, oy], i) => {
-            const sx = cx + ox, sy = cy + oy;
-            const ex = sx + wdx * aLen, ey = sy + wdy * aLen;
-            return (
-              <line key={i} x1={sx} y1={sy} x2={ex} y2={ey}
-                stroke={wColor} strokeWidth={1.2}
-                markerEnd={`url(#${markerId})`}
-                opacity={0.55 + (i % 3) * 0.12}
-              />
-            );
-          })}
-
-          {/* Calm indicator */}
-          {weather.windSpeed <= 1 && (
-            <circle cx={cx} cy={cy-25} r={22}
-              fill="none" stroke={wColor} strokeWidth={1}
-              strokeDasharray="3,4" opacity={0.4} />
-          )}
-        </g>
-
-        {/* Wind speed label — not rotated */}
-        {weather.windSpeed > 1 && (
-          <text x={SVG_W - 4} y={14} textAnchor="end"
-            fontFamily="monospace" fontSize={8} fill={wColor} opacity={0.85}>
-            {weather.windSpeed}mph {weather.windDir}
-          </text>
-        )}
-
-        {/* Compass N — not rotated */}
-        <g transform={`translate(10,14)`}>
-          <text x={0} y={0} textAnchor="middle" fontFamily="monospace" fontSize={7} fill="#2a3a4a">N</text>
-          <line x1={0} y1={2} x2={0} y2={8} stroke="#2a3a4a" strokeWidth={1} />
-          <line x1={-4} y1={5} x2={4} y2={5} stroke="#2a3a4a" strokeWidth={1} />
-        </g>
-
-        {/* Temp */}
-        <text x={SVG_W/2} y={SVG_H - 2} textAnchor="middle"
-          fontFamily="monospace" fontSize={8} fill="#3a4a5a">
-          {weather.tempF}°F
-        </text>
-      </svg>
-
-      {/* Impact label */}
-      <div style={{ fontFamily:F.mono, fontSize:8, color:wColor, marginTop:1, textAlign:"center", letterSpacing:1 }}>
-        {weather.windSpeed <= 1 ? "CALM — no wind effect"
-         : weather.hrImpact === "positive" ? "🚀 Wind OUT — HR boost"
-         : weather.hrImpact === "negative" ? "🛑 Wind IN — HR suppressed"
-         : "➡️ Crosswind — neutral"}
-      </div>
-    </div>
-  );
-}
 /* ════════ TOP 3 PARLAY BANNER ════════ */
 function ParlayBanner({ results }) {
   const [open, setOpen] = useState(true);
@@ -1344,13 +1089,20 @@ function ParlayBanner({ results }) {
     });
   });
 
-  const top3 = allPlayers
-    .sort((a, b) => {
-      const aScore = a.simHRs ?? (a.hrChancePct ?? 0) * 10;
-      const bScore = b.simHRs ?? (b.hrChancePct ?? 0) * 10;
-      return bScore - aScore;
-    })
-    .slice(0, 3);
+  // Sort all by sim%, then pick top 3 with no duplicate teams
+  const sorted = [...allPlayers].sort((a, b) => {
+    const aScore = a.simHRs ?? (a.hrChancePct ?? 0) * 10;
+    const bScore = b.simHRs ?? (b.hrChancePct ?? 0) * 10;
+    return bScore - aScore;
+  });
+  const usedTeams = new Set();
+  const top3 = [];
+  for (const p of sorted) {
+    if (top3.length >= 3) break;
+    if (!p.team || usedTeams.has(p.team)) continue;
+    usedTeams.add(p.team);
+    top3.push(p);
+  }
 
   if (top3.length < 2) return null;
 
@@ -1971,11 +1723,11 @@ export default function App() {
               hrChancePct:  p.hrChancePct ?? 0,
             };
           })
-          .sort((a, b) => {
-            const aScore = a.simHRs ?? (a.hrChancePct ?? 0) * 10;
-            const bScore = b.simHRs ?? (b.hrChancePct ?? 0) * 10;
-            return bScore - aScore;
-          })
+          .map(p => ({
+            ...p,
+            _sortScore: p.simHRs ?? (p.hrChancePct ?? 0) * 10,
+          }))
+          .sort((a, b) => b._sortScore - a._sortScore)
           .slice(0, 3); // Hard cap — always exactly 3 per game
 
         newResults[key] = { players: cleanPlayers };
@@ -2094,7 +1846,9 @@ export default function App() {
             };
           });
 
-        const merged = [...existing, ...extras].slice(0, 3);
+        const merged = [...existing, ...extras]
+          .sort((a,b)=>(b.simHRs??(b.hrChancePct??0)*10)-(a.simHRs??(a.hrChancePct??0)*10))
+          .slice(0,3);
         newResults[key] = { players: merged };
         if (merged.length > existing.length) {
           filledCount++;
