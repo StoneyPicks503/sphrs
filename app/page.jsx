@@ -1040,9 +1040,44 @@ async function fetchRealStats() {
 }
 
 
+/* ── Fetch live Vegas HR prop odds ── */
+async function fetchOdds() {
+  try {
+    const r = await fetch("/api/odds");
+    if (!r.ok) return {};
+    const d = await r.json();
+    return d.ok ? d.data : {};
+  } catch(e) { return {}; }
+}
+
+/* ── Fetch live MLB lineups ── */
+async function fetchLineups() {
+  try {
+    const r = await fetch("/api/lineup");
+    if (!r.ok) return {};
+    const d = await r.json();
+    return d.ok ? d.data : {};
+  } catch(e) { return {}; }
+}
+
+/* ── Batting order HR multiplier ──
+   Cleanup (3-5) = best spots: more RBI opps, pitchers attack zone
+   Leadoff (1) = fewer HR counts, pitchers nibble
+   Bottom (7-9) = pitchers less careful, but fewer quality ABs ── */
+function getBattingOrderMult(battingPos) {
+  if (!battingPos) return 1.0;
+  if (battingPos >= 3 && battingPos <= 5) return 1.08;  // cleanup = prime HR spot
+  if (battingPos === 2) return 1.03;
+  if (battingPos === 1) return 0.96;  // leadoff = fewer HR counts
+  if (battingPos >= 6 && battingPos <= 7) return 0.98;
+  if (battingPos >= 8) return 0.94;  // bottom = fewest quality ABs
+  return 1.0;
+}
+
+
 /* ── Real Monte Carlo HR Simulation ── */
 // Inputs: batter stats, pitcher stats, weather boost (-1 to +1), park factor, N trials
-function runHRSimulation(batter, pitcher, weatherBoost = 0, N = 1000, parkFactor = 1.0) {
+function runHRSimulation(batter, pitcher, weatherBoost = 0, N = 1000, parkFactor = 1.0, battingPos = 0) {
   const gp = batter?.gp || 33;
   const hr = batter?.hr || 3;
 
@@ -1074,7 +1109,10 @@ function runHRSimulation(batter, pitcher, weatherBoost = 0, N = 1000, parkFactor
   // 5. Wind — live Open-Meteo
   const weatherMult = 1 + (Math.max(-1, Math.min(1, weatherBoost)) * 0.10);
 
-  const hrProb = Math.min(0.40, baseRate * evMult * pitcherMult * pf * weatherMult);
+  // 6. Batting order position (real lineup data)
+  const orderMult = getBattingOrderMult(battingPos);
+
+  const hrProb = Math.min(0.40, baseRate * evMult * pitcherMult * pf * weatherMult * orderMult);
 
   let hits = 0;
   for (let i = 0; i < N; i++) {
@@ -1292,14 +1330,33 @@ function PlayerRow({ p, rank, delay=0, game }) {
         <div style={{ padding:"0 12px 14px 12px", borderTop:"1px solid "+T.border }}>
           <div style={{ marginTop:10, display:"flex", flexDirection:"column", gap:7 }}>
             <div style={{ background:"rgba(0,229,255,0.07)", border:"1px solid rgba(0,229,255,0.25)",
-              borderRadius:8, padding:"8px 12px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-              <span style={{ fontFamily:F.mono, fontSize:9, color:T.muted, letterSpacing:1 }}>
-                2026 SEASON <span style={{ color:"#00e676", fontSize:7 }}>● LIVE</span>
-              </span>
-              <span style={{ fontFamily:F.arch, fontSize:14, color:"#00e5ff" }}>
-                {p.seasonHRs??"—"} HR
-                <span style={{ fontFamily:F.mono, fontSize:9, color:T.muted, marginLeft:6 }}>in {p.gamesPlayed??"—"}g</span>
-              </span>
+              borderRadius:8, padding:"8px 12px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:(p.vegasProb||p.battingPos>0)?6:0 }}>
+                <span style={{ fontFamily:F.mono, fontSize:9, color:T.muted, letterSpacing:1 }}>
+                  2026 SEASON <span style={{ color:"#00e676", fontSize:7 }}>● LIVE</span>
+                </span>
+                <span style={{ fontFamily:F.arch, fontSize:14, color:"#00e5ff" }}>
+                  {p.seasonHRs??"—"} HR
+                  <span style={{ fontFamily:F.mono, fontSize:9, color:T.muted, marginLeft:6 }}>in {p.gamesPlayed??"—"}g</span>
+                </span>
+              </div>
+              {(p.vegasProb || p.battingPos > 0) && (
+                <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                  {p.battingPos > 0 && (
+                    <div style={{ fontFamily:F.mono, fontSize:9, background:"rgba(0,229,255,0.1)",
+                      border:"1px solid rgba(0,229,255,0.25)", borderRadius:5, padding:"3px 8px", color:T.accent }}>
+                      📋 BATS {p.battingPos}{["st","nd","rd"][p.battingPos-1]||"th"}
+                      {p.battingPos>=3&&p.battingPos<=5?" 🔥":""}
+                    </div>
+                  )}
+                  {p.vegasProb && (
+                    <div style={{ fontFamily:F.mono, fontSize:9, background:"rgba(255,215,0,0.1)",
+                      border:"1px solid rgba(255,215,0,0.3)", borderRadius:5, padding:"3px 8px", color:T.gold }}>
+                      💰 VEGAS {p.vegasProb}% implied
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div style={{ background:"rgba(255,202,40,0.07)", border:"1px solid rgba(255,202,40,0.25)",
               borderRadius:8, padding:"8px 12px" }}>
@@ -1341,12 +1398,25 @@ function PlayerRow({ p, rank, delay=0, game }) {
               </div>
             )}
             <div style={{ background:"rgba(0,230,118,0.06)", border:"1px solid rgba(0,230,118,0.2)",
-              borderRadius:8, padding:"8px 12px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-              <span style={{ fontFamily:F.mono, fontSize:9, color:"#00e676", letterSpacing:1 }}>1,000× SIM ● REAL STATS</span>
-              <span style={{ fontFamily:F.bebas, fontSize:22, color:c, textShadow:glow }}>
-                {hrPct.toFixed(1)}%
-                <span style={{ fontFamily:F.mono, fontSize:9, color:"#7a9abf", marginLeft:6 }}>({p.simHRs??"—"}/1k)</span>
-              </span>
+              borderRadius:8, padding:"8px 12px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <span style={{ fontFamily:F.mono, fontSize:9, color:"#00e676", letterSpacing:1 }}>1,000× SIM ● REAL STATS</span>
+                <span style={{ fontFamily:F.bebas, fontSize:22, color:c, textShadow:glow }}>
+                  {hrPct.toFixed(1)}%
+                  <span style={{ fontFamily:F.mono, fontSize:9, color:"#7a9abf", marginLeft:6 }}>({p.simHRs??"—"}/1k)</span>
+                </span>
+              </div>
+              {p.vegasProb && (
+                <div style={{ fontFamily:F.mono, fontSize:9, marginTop:5, letterSpacing:0.5,
+                  color: hrPct > p.vegasProb+3 ? "#00e676" : hrPct < p.vegasProb-3 ? "#ff5252" : "#7a9abf" }}>
+                  {hrPct > p.vegasProb+3
+                    ? "✅ SIM ABOVE VEGAS — potential value"
+                    : hrPct < p.vegasProb-3
+                    ? "⚠️ SIM BELOW VEGAS — market disagrees"
+                    : "≈ Aligned with market"}
+                  {" · Vegas: "+p.vegasProb+"%"}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1672,6 +1742,22 @@ export default function App() {
         ? "✅ Real Statcast — " + savantCount + " batters loaded (EV, LA, HR/9)"
         : "⚠️ Savant unavailable — using season HR rate only");
 
+      // ── Live Vegas HR prop odds ──
+      setStep("💰 Fetching Vegas HR props...");
+      const oddsMap = await fetchOdds();
+      const oddsCount = Object.keys(oddsMap).length;
+      setStep(oddsCount > 0
+        ? "✅ Vegas odds — " + oddsCount + " HR props loaded"
+        : "⚠️ Odds unavailable (add ODDS_API_KEY to .env.local)");
+
+      // ── Live lineups ──
+      setStep("📋 Fetching live lineups...");
+      const lineupMap = await fetchLineups();
+      const lineupConfirmed = Object.values(lineupMap).filter(l => l.confirmed).length;
+      setStep(lineupConfirmed > 0
+        ? "✅ Lineups — " + lineupConfirmed + "/" + games.length + " confirmed"
+        : "⏳ Lineups not posted yet — batting order TBD");
+
       // ── Attach weather to game objects ──
       setGames(prev => prev.map(g => ({ ...g, weather: weatherMap[g.away+g.home] || null })));
 
@@ -1787,7 +1873,14 @@ export default function App() {
             const savantPitcher = savantPitchers[p.pitcher] || savantPitchers[p.pitcher?.replace(/\s+(Jr|Sr)\.?$/i,"").trim()] || {};
             const simBatter  = { hr: knownHR||3, gp:33, avgEV: savantBatter.avgEV||null, avgLA: savantBatter.avgLA||null };
             const simPitcher = { era: p.pitcherERA||4.20, hr9: savantPitcher.hr9||0 };
-            const simCount = runHRSimulation(simBatter, simPitcher, wBoost, 1000, parkFactor);
+            // Batting order from live lineup
+            const gameLineup  = lineupMap?.[gameKey2] || {};
+            const orderMap    = p.isHome ? gameLineup.homeOrder : gameLineup.awayOrder;
+            const battingPos  = orderMap?.[p.name] || 0;
+            // Vegas implied probability
+            const vegasEntry  = oddsMap?.[p.name] || oddsMap?.[p.name?.replace(/\s+(Jr|Sr)\.?$/i,"").trim()];
+            const vegasProb   = vegasEntry?.impliedProb || null;
+            const simCount = runHRSimulation(simBatter, simPitcher, wBoost, 1000, parkFactor, battingPos);
             const weatherInsight = w && w.isOutdoor !== false
               ? w.tempF+"°F · "+w.windSpeed+"mph "+w.windDir+" ("+(w.windVsField||"?")+")"
               : w?.isOutdoor === false ? "Indoor dome" : "";
@@ -1801,6 +1894,8 @@ export default function App() {
               seasonHRs:   knownHR ?? p.seasonHRs ?? null,
               gamesPlayed: 33,
               simHRs:      Math.min(Math.round(simCount), 1000),
+              battingPos,
+              vegasProb,
               weatherInsight,
               bvpSummary:  "No BvP data",
               bvpHR: null, bvpAB: null, bvpAVG: null,
