@@ -1181,16 +1181,16 @@ function StadiumWindView({ game, weather }) {
   const cy = 95;  // center of field; HP will be at cy+48
   const fieldRotation = -cfBearing;
 
-  // Wind arrow direction relative to field
-  const windFrom = weather.windDeg ?? 0;
-  const windTo   = (windFrom + 180) % 360;
-  const windArrowAngle = windTo - cfBearing;
+  // Wind arrow direction — meteorological convention: windDeg = direction FROM
+  const windFrom = typeof weather.windDeg === "number" ? weather.windDeg : 0;
+  const windTo   = (windFrom + 180) % 360;          // direction wind is GOING
+  const windArrowAngle = windTo - cfBearing;          // relative to field's CF direction
   const windRad  = (windArrowAngle - 90) * (Math.PI / 180);
-  const arrowLen = 40;
+  const arrowLen = 48;
   const ax  = cx + Math.cos(windRad) * arrowLen;
   const ay  = cy + Math.sin(windRad) * arrowLen;
-  const ax2 = cx - Math.cos(windRad) * 14;
-  const ay2 = cy - Math.sin(windRad) * 14;
+  const ax2 = cx - Math.cos(windRad) * 16;
+  const ay2 = cy - Math.sin(windRad) * 16;
 
   const wColor = weather.hrImpact === "positive" ? "#00e676"
                : weather.hrImpact === "negative" ? "#ff5252" : "#7a9abf";
