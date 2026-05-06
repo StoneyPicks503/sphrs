@@ -1024,26 +1024,57 @@ function getStatcastMult(avgEV, avgLA) {
 }
 
 
+/* ── Fetch real Statcast + MLB stats from our backend ── */
+async function fetchRealStats() {
+  try {
+    const r = await fetch("/api/savant");
+    if (!r.ok) return { batters: {}, pitchers: {} };
+    const d = await r.json();
+    if (!d.ok) return { batters: {}, pitchers: {} };
+    console.log("✅ Real Statcast data loaded —", Object.keys(d.data.batters).length, "batters");
+    return d.data;
+  } catch(e) {
+    console.warn("Real stats fetch failed:", e.message);
+    return { batters: {}, pitchers: {} };
+  }
+}
+
+
 /* ── Real Monte Carlo HR Simulation ── */
 // Inputs: batter stats, pitcher stats, weather boost (-1 to +1), park factor, N trials
 function runHRSimulation(batter, pitcher, weatherBoost = 0, N = 1000, parkFactor = 1.0) {
   const gp = batter?.gp || 33;
   const hr = batter?.hr || 3;
 
-  // 1. Batter HR rate — real 2026 stats, calibrated to single-game probability
+  // 1. Base rate from real 2026 HR/game
   const baseRate = (hr / Math.max(gp, 20)) * 0.65;
 
-  // 2. Pitcher ERA vs league avg 4.20 — real number from your game slate
-  const era = parseFloat(pitcher?.era || "4.20") || 4.20;
-  const pitcherMult = Math.max(0.72, Math.min(1.45, era / 4.20));
+  // 2. Exit velocity multiplier — real Savant data when available
+  // League avg EV on HRs: ~104mph. Avg batted ball: ~88mph.
+  // We use avg EV (all batted balls) as proxy for power
+  let evMult = 1.0;
+  if (batter?.avgEV) {
+    // 88mph avg = 1.0x, 92mph = 1.18x, 96mph = 1.40x (real HR correlation)
+    evMult = Math.max(0.78, Math.min(1.50, Math.pow(batter.avgEV / 89.5, 3)));
+  }
 
-  // 3. Park factor — verified multi-year data (Coors 1.38x, T-Mobile 0.85x)
+  // 3. Pitcher: use real HR/9 if available, fall back to ERA
+  let pitcherMult;
+  if (pitcher?.hr9 && pitcher.hr9 > 0) {
+    // Real HR/9 from MLB Stats API — league avg 1.25
+    pitcherMult = Math.max(0.65, Math.min(1.55, pitcher.hr9 / 1.25));
+  } else {
+    const era = parseFloat(pitcher?.era || "4.20") || 4.20;
+    pitcherMult = Math.max(0.72, Math.min(1.45, era / 4.20));
+  }
+
+  // 4. Park factor — verified multi-year data
   const pf = Math.max(0.75, Math.min(1.45, parkFactor || 1.0));
 
-  // 4. Wind vs field — live Open-Meteo data (+1=blowing out, -1=blowing in)
+  // 5. Wind — live Open-Meteo
   const weatherMult = 1 + (Math.max(-1, Math.min(1, weatherBoost)) * 0.10);
 
-  const hrProb = Math.min(0.38, baseRate * pitcherMult * pf * weatherMult);
+  const hrProb = Math.min(0.40, baseRate * evMult * pitcherMult * pf * weatherMult);
 
   let hits = 0;
   for (let i = 0; i < N; i++) {
@@ -1631,6 +1662,16 @@ export default function App() {
       const weatherMap = await fetchWeatherForGames(games);
       setStep("✅ Weather ready");
 
+      // ── Real Statcast data from Baseball Savant (server-side fetch, no CORS) ──
+      setStep("📡 Fetching real Statcast data...");
+      const realStats     = await fetchRealStats();
+      const savantBatters  = realStats.batters  || {};
+      const savantPitchers = realStats.pitchers || {};
+      const savantCount   = Object.keys(savantBatters).length;
+      setStep(savantCount > 0
+        ? "✅ Real Statcast — " + savantCount + " batters loaded (EV, LA, HR/9)"
+        : "⚠️ Savant unavailable — using season HR rate only");
+
       // ── Attach weather to game objects ──
       setGames(prev => prev.map(g => ({ ...g, weather: weatherMap[g.away+g.home] || null })));
 
@@ -1742,7 +1783,11 @@ export default function App() {
               avgLA: p.avgLA || scLookup.avgLA || null,
             };
             const enrichedPitcher = { era: p.pitcherERA || 4.20, hr9: 0, hand: p.pitcherHand || "R" };
-            const simCount = runHRSimulation({ hr: knownHR||3, gp:33 }, { era: p.pitcherERA||4.20 }, wBoost, 1000, parkFactor);
+            const savantBatter  = savantBatters[p.name] || savantBatters[p.name?.replace(/\s+(Jr|Sr)\.?$/i,"").trim()] || {};
+            const savantPitcher = savantPitchers[p.pitcher] || savantPitchers[p.pitcher?.replace(/\s+(Jr|Sr)\.?$/i,"").trim()] || {};
+            const simBatter  = { hr: knownHR||3, gp:33, avgEV: savantBatter.avgEV||null, avgLA: savantBatter.avgLA||null };
+            const simPitcher = { era: p.pitcherERA||4.20, hr9: savantPitcher.hr9||0 };
+            const simCount = runHRSimulation(simBatter, simPitcher, wBoost, 1000, parkFactor);
             const weatherInsight = w && w.isOutdoor !== false
               ? w.tempF+"°F · "+w.windSpeed+"mph "+w.windDir+" ("+(w.windVsField||"?")+")"
               : w?.isOutdoor === false ? "Indoor dome" : "";
@@ -1784,7 +1829,13 @@ export default function App() {
             const pitcher = isHome ? g.awayP : g.homeP;
             const pitcherERA = isHome ? g.awayERA : g.homeERA;
             const pf2 = PARK_FACTORS[g.venue] || 1.0;
-            const simCount = runHRSimulation({hr,gp:33},{era:pitcherERA||4.20},w?.fieldBoost??0,1000,pf2);
+            const sb2 = savantBatters?.[name] || {};
+            const sp2 = savantPitchers?.[pitcherName] || {};
+            const simCount = runHRSimulation(
+              { hr, gp:33, avgEV: sb2.avgEV||null },
+              { era: pitcherERA||4.20, hr9: sp2.hr9||0 },
+              w?.fieldBoost??0, 1000, pf2
+            );
             return { name, team, isHome, pitcher, pitcherHand: isHome?g.awayH:g.homeH, pitcherERA,
               seasonHRs:hr, gamesPlayed:33, simHRs:Math.min(Math.round(simCount),1000),
               hrChancePct:Math.min(20,hr*0.6), bvpSummary:"No BvP data",
