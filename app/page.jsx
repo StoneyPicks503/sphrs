@@ -1874,7 +1874,7 @@ export default function App() {
             const simBatter  = { hr: knownHR||3, gp:33, avgEV: savantBatter.avgEV||null, avgLA: savantBatter.avgLA||null };
             const simPitcher = { era: p.pitcherERA||4.20, hr9: savantPitcher.hr9||0 };
             // Batting order from live lineup
-            const gameLineup  = lineupMap?.[gameKey2] || {};
+            const gameLineup  = lineupMap?.[key] || {};
             const orderMap    = p.isHome ? gameLineup.homeOrder : gameLineup.awayOrder;
             const battingPos  = orderMap?.[p.name] || 0;
             // Vegas implied probability
