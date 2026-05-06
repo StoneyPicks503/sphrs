@@ -1260,14 +1260,14 @@ export default function App() {
       });
 
       // ── Batch Claude analysis ──
-      const BATCH = 2;
+      const BATCH = 3;
       const batches = [];
       for (let i = 0; i < games.length; i += BATCH) batches.push(games.slice(i, i+BATCH));
 
       const allGameResults = [];
 
       for (let b = 0; b < batches.length; b++) {
-        if (b > 0) await new Promise(r => setTimeout(r, 1500));
+        if (b > 0) await new Promise(r => setTimeout(r, 4000));
         setStep("🤖 Analyzing batch " + (b+1) + " of " + batches.length + "...");
         setProgress(Math.round(20 + (b / batches.length) * 60));
 
