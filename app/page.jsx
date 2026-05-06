@@ -509,6 +509,19 @@ async function fetchPitcherIds(pitcherNames) {
 
 
 /* ── Team ID map for MLB Stats API ── */
+/* ── Park HR factors (based on multi-year HR park factor data) ── */
+const PARK_FACTORS = {
+  "Coors Field":1.38, "Sutter Health Park":1.28, "Wrigley Field":1.14,
+  "Yankee Stadium":1.10, "Fenway Park":1.06, "Great American":1.06,
+  "Citizens Bank Park":1.05, "Angel Stadium":1.02, "Target Field":1.01,
+  "Busch Stadium":1.00, "Nationals Park":1.00, "Kauffman Stadium":0.99,
+  "Comerica Park":0.99, "Truist Park":0.98, "PNC Park":0.96,
+  "Guaranteed Rate":0.96, "loanDepot Park":0.95, "Daikin Park":0.95,
+  "Tropicana Field":0.94, "Globe Life Field":0.94, "Chase Field":0.93,
+  "Oracle Park":0.90, "Petco Park":0.88, "T-Mobile Park":0.85,
+};
+
+
 const TEAM_IDS = {
   AZ:108, ATL:144, BAL:110, BOS:111, CHC:112, CIN:113, CLE:114,
   COL:115, DET:116, HOU:117, KC:118, LAA:108, LAD:119, MIA:146,
@@ -683,36 +696,44 @@ async function fetchInjuredPlayers() {
 
 
 /* ── Real Monte Carlo HR Simulation ── */
-// Runs N simulations of a batter vs pitcher using real fetched stats
-// Returns number of simulated HR out of N attempts
-function runHRSimulation(batter, pitcher, weatherBoost = 0, N = 1000) {
+// Inputs: batter stats, pitcher stats, weather boost (-1 to +1), park factor, N trials
+function runHRSimulation(batter, pitcher, weatherBoost = 0, N = 1000, parkFactor = 1.0) {
   const gp  = batter?.gp || 33;
   const hr  = batter?.hr || 3;
   const ops = parseFloat(batter?.ops || "0.720") || 0.720;
 
-  // Realistic per-game HR probability benchmarks:
-  // Elite (Judge ~58HR pace): ~18-22% per game
-  // Good power (15-20 HR pace): ~10-14%
-  // Average (8-12 HR pace): ~5-8%
-  // Low power (1-4 HR pace): ~1-4%
-
-  // Scale HR/game down to realistic probability
-  // Raw HR/game (e.g. 13/34 = 0.382) needs to be ~halved
+  // ── Batter base rate ──
+  // HR per game × 0.5 calibration = realistic single-game probability
   const rawRate  = hr / Math.max(gp, 20);
-  const baseRate = rawRate * 0.5; // realistic calibration
+  const baseRate = rawRate * 0.5;
 
-  // OPS adds a small boost for elite hitters
+  // OPS boost — elite hitters get a small extra lift
   const opsBoost = Math.max(0, (ops - 0.750) * 0.08);
 
-  // Pitcher ERA vs league avg 4.20
-  const era = parseFloat(pitcher?.era || "4.20") || 4.20;
-  const pitcherMult = Math.max(0.7, Math.min(1.45, era / 4.20));
+  // ── Pitcher multiplier ──
+  // Use HR/9 if available (most accurate) — league avg is ~1.25 HR/9
+  // Fall back to ERA-based estimate if HR/9 not provided
+  let pitcherMult;
+  const hr9 = parseFloat(pitcher?.hr9 || "0");
+  if (hr9 > 0) {
+    // HR/9: 0.8 = elite, 1.25 = avg, 2.0+ = very hittable
+    pitcherMult = Math.max(0.6, Math.min(1.6, hr9 / 1.25));
+  } else {
+    // ERA proxy: league avg 4.20
+    const era = parseFloat(pitcher?.era || "4.20") || 4.20;
+    pitcherMult = Math.max(0.7, Math.min(1.45, era / 4.20));
+  }
 
-  // Weather: -1 = blowing in (suppresses), +1 = blowing out (boosts)
+  // ── Park factor ──
+  // 1.38 = Coors (huge boost), 1.0 = neutral, 0.85 = T-Mobile (suppressor)
+  const pf = Math.max(0.75, Math.min(1.45, parkFactor || 1.0));
+
+  // ── Weather ──
+  // fieldBoost: +1 = wind blowing out (HR boost), -1 = wind blowing in
   const weatherMult = 1 + (Math.max(-1, Math.min(1, weatherBoost)) * 0.10);
 
-  // Final probability — cap at 30% (even elite spots rarely exceed this)
-  const hrProb = Math.min(0.30, (baseRate + opsBoost) * pitcherMult * weatherMult);
+  // ── Final probability ──
+  const hrProb = Math.min(0.32, (baseRate + opsBoost) * pitcherMult * pf * weatherMult);
 
   let hits = 0;
   for (let i = 0; i < N; i++) {
@@ -1397,7 +1418,8 @@ export default function App() {
             const wBoost = w?.fieldBoost ?? 0;
             const simBat = { hr: knownHR||3, gp:33, ops:"0.750" };
             const pitcherForSim = { era: pitcherERA || 4.20 };
-            const simCount = runHRSimulation(simBat, pitcherForSim, wBoost, 1000);
+            const parkFactor = PARK_FACTORS[gameObj?.venue] || 1.0;
+            const simCount = runHRSimulation(simBat, pitcherForSim, wBoost, 1000, parkFactor);
             const weatherInsight = w && w.isOutdoor !== false
               ? w.tempF+"°F · "+w.windSpeed+"mph "+w.windDir+" ("+(w.windVsField||"?")+")"
               : w?.isOutdoor === false ? "Indoor dome" : "";
@@ -1434,7 +1456,8 @@ export default function App() {
             const isHome = team === g.home;
             const pitcher = isHome ? g.awayP : g.homeP;
             const pitcherERA = isHome ? g.awayERA : g.homeERA;
-            const simCount = runHRSimulation({hr,gp:33,ops:"0.750"},{era:pitcherERA||4.20},w?.fieldBoost??0,1000);
+            const pf2 = PARK_FACTORS[g.venue] || 1.0;
+            const simCount = runHRSimulation({hr,gp:33,ops:"0.750"},{era:pitcherERA||4.20},w?.fieldBoost??0,1000,pf2);
             return { name, team, isHome, pitcher, pitcherHand: isHome?g.awayH:g.homeH, pitcherERA,
               seasonHRs:hr, gamesPlayed:33, simHRs:Math.min(Math.round(simCount),1000),
               hrChancePct:Math.min(20,hr*0.6), bvpSummary:"No BvP data",
