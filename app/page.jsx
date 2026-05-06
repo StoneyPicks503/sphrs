@@ -1245,20 +1245,32 @@ export default function App() {
 
     try {
       setStep("⚾ Loading " + games.length + " games...");
+      await new Promise(r => setTimeout(r, 150));
 
-      // Weather only — Open-Meteo has no rate limit
-      setStep("🌤 Fetching weather...");
+      // ── Weather (Open-Meteo — no rate limit) ──
+      setStep("🌤 Fetching live weather...");
       const weatherMap = await fetchWeatherForGames(games);
       const weatherHits = Object.values(weatherMap).filter(w => w !== null).length;
-      setStep("✅ Weather ready — " + weatherHits + "/" + games.length + " stadiums");
+      setStep("✅ Weather loaded — " + weatherHits + "/" + games.length + " stadiums");
 
-      // Use hardcoded KNOWN_2026_HR + BATTER_IDS — no MLB API calls needed
-      const liveHRMap = {};
-      const pitcherIdMap = PITCHER_IDS; // already hardcoded
+      // ── Live HR stats ──
+      setStep("📊 Fetching 2026 HR stats from MLB...");
+      const liveHRMap = await fetchLiveHRStats();
+      setStep("✅ HR stats loaded — " + Object.keys(liveHRMap).length + " players");
+
+      // ── Pitcher IDs (hardcoded + API fallback) ──
+      const allPitcherNames = [...new Set(games.flatMap(g => [g.awayP, g.homeP]).filter(p => p && p !== "TBD"))];
+      const pitcherIdMap = await fetchPitcherIds(allPitcherNames);
+      setStep("✅ " + Object.keys(pitcherIdMap).length + " pitcher IDs ready");
+
+      // ── Injury report ──
+      setStep("🏥 Checking injury report...");
+      const injuredPlayers = await fetchInjuredPlayers();
+      setStep("🏥 " + injuredPlayers.size + " players on IL");
+
       const bvpCache = {};
-      const injuredPlayers = new Set(); // skip injury API to avoid rate limit
 
-      setStep("🎲 Running simulations + Claude analysis...");
+      setStep("🎲 Running analysis...");
       await new Promise(r => setTimeout(r, 150));
 
       // Consolidated game data from all batches
@@ -1286,8 +1298,8 @@ export default function App() {
       })));
 
       for (let b = 0; b < batches.length; b++) {
-        // Skip prefetch — hardcoded data only to avoid rate limits
-        const batchGameData = {};
+        // Pre-fetch pitcher data for this batch
+        const batchGameData = await prefetchGameData(batches[b]);
         Object.assign(allGameData, batchGameData);
 
         if (b > 0) await new Promise(r => setTimeout(r, 500)); // pause between batches
@@ -1675,6 +1687,28 @@ export default function App() {
         newResults[key] = { players: cleanPlayers };
       });
 
+
+      // ── BvP + Arsenal enrichment (sequential to avoid rate limits) ──
+      setStep("⚔️ Fetching live BvP stats...");
+      const bvpFetches = [];
+      Object.values(newResults).forEach(gr => {
+        (gr.players ?? []).forEach(p => {
+          const batterId = BATTER_IDS[p.name] ?? BATTER_IDS[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()] ?? p.mlbId;
+          const pitcherName = p.pitcher || "";
+          const pitcherId = pitcherIdMap[pitcherName] ?? PITCHER_IDS[pitcherName];
+          if (batterId && pitcherId) {
+            bvpFetches.push(
+              Promise.all([fetchBvP(batterId, pitcherId), fetchPitcherArsenal(pitcherId)]).then(([bvp, arsenal]) => {
+                if (bvp) { p.bvpHR=bvp.hr; p.bvpAB=bvp.ab; p.bvpAVG=bvp.avg;
+                  p.bvpSummary=bvp.ab+" AB · "+bvp.avg+" AVG · "+bvp.hr+" HR"; }
+                if (arsenal?.length > 0) p.pitcherArsenal = arsenal;
+              })
+            );
+          }
+        });
+      });
+      for (const f of bvpFetches) { await f; await new Promise(r => setTimeout(r, 100)); }
+      setStep("✅ BvP data loaded — " + bvpFetches.length + " matchups");
 
       setResults({...newResults}); // trigger re-render with BvP data
       setOpenGames(new Set(games.map(g => g.away + g.home)));
