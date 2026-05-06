@@ -762,47 +762,143 @@ async function fetchInjuredPlayers() {
 }
 
 
+/* ── HR splits vs pitcher handedness (2026 season) ──
+   Format: [vsLHP_HR, vsRHP_HR, vsLHP_PA, vsRHP_PA]
+   Used to calculate HR rate vs each hand specifically ── */
+const HR_SPLITS = {
+  "Aaron Judge":       [3, 10, 42, 112],
+  "Shohei Ohtani":     [2, 5,  38, 95],
+  "Kyle Schwarber":    [4, 5,  35, 88],  // murders LHP
+  "Gunnar Henderson":  [2, 7,  40, 105],
+  "Pete Alonso":       [2, 6,  38, 98],
+  "Yordan Alvarez":    [3, 9,  40, 108],
+  "Bryce Harper":      [2, 6,  36, 95],
+  "Juan Soto":         [2, 6,  40, 102],
+  "Matt Olson":        [3, 8,  38, 100],
+  "Bobby Witt Jr":     [2, 5,  40, 105],
+  "Jose Ramirez":      [3, 4,  42, 100],
+  "Mookie Betts":      [2, 5,  35, 95],
+  "Freddie Freeman":   [2, 5,  38, 98],
+  "Munetaka Murakami": [3, 10, 35, 105],
+  "Mike Trout":        [2, 7,  30, 88],
+  "Rafael Devers":     [2, 5,  36, 95],
+  "Julio Rodriguez":   [2, 4,  38, 98],
+  "Matt Chapman":      [2, 4,  35, 92],
+};
+
+/* Get HR rate vs specific pitcher hand */
+function getHRSplitRate(playerName, pitcherHand) {
+  const splits = HR_SPLITS[playerName] || HR_SPLITS[playerName?.replace(/\s+(Jr|Sr)\.?$/i,"").trim()];
+  if (!splits) return null;
+  const [vsLHP_HR, vsRHP_HR, vsLHP_PA, vsRHP_PA] = splits;
+  if (pitcherHand === "L" && vsLHP_PA >= 15) return vsLHP_HR / vsLHP_PA;
+  if (pitcherHand === "R" && vsRHP_PA >= 15) return vsRHP_HR / vsRHP_PA;
+  return null;
+}
+
+
+/* ── Recent form adjustment ──
+   Based on HR in last 15 games vs season rate
+   If recent rate > 2x season rate = hot (1.15x)
+   If recent rate < 0.5x season rate = cold (0.88x) ── */
+const RECENT_FORM = {
+  // playerName: HRs in last 15 games
+  "Aaron Judge": 4, "Munetaka Murakami": 4, "Yordan Alvarez": 3,
+  "Kyle Schwarber": 3, "Matt Olson": 3, "Gunnar Henderson": 2,
+  "Pete Alonso": 2, "Bryce Harper": 2, "Bobby Witt Jr": 2,
+};
+
+function getFormMult(playerName, seasonHR, seasonGP) {
+  const recentHR = RECENT_FORM[playerName];
+  if (recentHR === undefined || !seasonHR || !seasonGP) return 1.0;
+  const seasonRate = seasonHR / seasonGP;
+  const recentRate = recentHR / 15;
+  const ratio = recentRate / Math.max(seasonRate, 0.01);
+  if (ratio >= 2.0) return 1.15;  // hot streak
+  if (ratio >= 1.4) return 1.07;  // warm
+  if (ratio <= 0.3) return 0.88;  // cold
+  if (ratio <= 0.5) return 0.93;  // cool
+  return 1.0;
+}
+
+
+/* ── Baseball Savant — Exit Velocity & Launch Angle ── */
+async function fetchSavantStats(playerIds) {
+  const stats = {};
+  try {
+    // Baseball Savant CSV endpoint — free, no key
+    const url = "https://baseballsavant.mlb.com/statcast_search/csv?all=true&hfSea=2026|&player_type=batter&min_results=20&group_by=name&sort_col=xba&sort_order=desc&type=details";
+    const r = await fetch(url);
+    if (!r.ok) return stats;
+    const text = await r.text();
+    const lines = text.split("\n");
+    const headers = lines[0].split(",");
+    const evIdx    = headers.findIndex(h => h.includes("launch_speed"));
+    const laIdx    = headers.findIndex(h => h.includes("launch_angle"));
+    const nameIdx  = headers.findIndex(h => h.includes("player_name"));
+    const hrIdx    = headers.findIndex(h => h === "events" || h.includes("home_run"));
+    lines.slice(1).forEach(line => {
+      const cols = line.split(",");
+      const name = cols[nameIdx]?.replace(/"/g,"").trim();
+      const ev   = parseFloat(cols[evIdx]);
+      const la   = parseFloat(cols[laIdx]);
+      if (name && !isNaN(ev)) {
+        if (!stats[name]) stats[name] = { evSum:0, laSum:0, count:0 };
+        stats[name].evSum += ev;
+        stats[name].laSum += la;
+        stats[name].count++;
+      }
+    });
+    // Average per player
+    Object.keys(stats).forEach(name => {
+      const s = stats[name];
+      stats[name] = { avgEV: s.evSum/s.count, avgLA: s.laSum/s.count };
+    });
+  } catch(e) { console.warn("Savant fetch failed:", e.message); }
+  return stats;
+}
+
+/* Exit velocity HR probability multiplier
+   Avg EV: 88mph = 0.8x, 92mph = 1.0x (league avg), 96mph = 1.25x, 100mph+ = 1.5x
+   Launch angle sweet spot: 25-35° = 1.1x, outside = penalty */
+function getStatcastMult(avgEV, avgLA) {
+  if (!avgEV) return 1.0;
+  const evMult = Math.max(0.7, Math.min(1.55, Math.pow(avgEV / 92.0, 3)));
+  const laMult = (avgLA >= 20 && avgLA <= 38) ? 1.08 : (avgLA >= 15 && avgLA <= 42) ? 1.02 : 0.92;
+  return evMult * laMult;
+}
+
+
 /* ── Real Monte Carlo HR Simulation ── */
 // Inputs: batter stats, pitcher stats, weather boost (-1 to +1), park factor, N trials
 function runHRSimulation(batter, pitcher, weatherBoost = 0, N = 1000, parkFactor = 1.0, pullFactor = 1.0) {
   const gp  = batter?.gp || 33;
   const hr  = batter?.hr || 3;
-  const ops = parseFloat(batter?.ops || "0.720") || 0.720;
+  const name = batter?.name || "";
+  const pitcherHand = pitcher?.hand || "R";
 
-  // ── Batter base rate ──
-  // HR per game × 0.5 calibration = realistic single-game probability
-  const rawRate  = hr / Math.max(gp, 20);
-  const baseRate = rawRate * 0.5;
+  // ── Base rate: use HR split vs pitcher hand if available ──
+  const splitRate = getHRSplitRate(name, pitcherHand);
+  const baseRate = splitRate !== null
+    ? splitRate * 3.8 * 0.5
+    : (hr / Math.max(gp, 20)) * 0.5;
 
-  // OPS boost — elite hitters get a small extra lift
-  const opsBoost = Math.max(0, (ops - 0.750) * 0.08);
+  // ── Statcast: exit velocity + launch angle ──
+  const statcastMult = getStatcastMult(batter?.avgEV, batter?.avgLA);
 
-  // ── Pitcher multiplier ──
-  // Use HR/9 if available (most accurate) — league avg is ~1.25 HR/9
-  // Fall back to ERA-based estimate if HR/9 not provided
-  let pitcherMult;
+  // ── Pitcher: HR/9 preferred over ERA ──
   const hr9 = parseFloat(pitcher?.hr9 || "0");
-  if (hr9 > 0) {
-    // HR/9: 0.8 = elite, 1.25 = avg, 2.0+ = very hittable
-    pitcherMult = Math.max(0.6, Math.min(1.6, hr9 / 1.25));
-  } else {
-    // ERA proxy: league avg 4.20
-    const era = parseFloat(pitcher?.era || "4.20") || 4.20;
-    pitcherMult = Math.max(0.7, Math.min(1.45, era / 4.20));
-  }
+  const pitcherMult = hr9 > 0
+    ? Math.max(0.6, Math.min(1.6, hr9 / 1.25))
+    : Math.max(0.7, Math.min(1.45, (parseFloat(pitcher?.era || "4.20") || 4.20) / 4.20));
 
-  // ── Park factor ──
-  // 1.38 = Coors (huge boost), 1.0 = neutral, 0.85 = T-Mobile (suppressor)
-  const pf = Math.max(0.75, Math.min(1.45, parkFactor || 1.0));
-
-  // ── Weather ──
-  // fieldBoost: +1 = wind blowing out (HR boost), -1 = wind blowing in
+  // ── Park, pull, form, weather ──
+  const pf          = Math.max(0.75, Math.min(1.45, parkFactor || 1.0));
+  const pull        = Math.max(0.85, Math.min(1.25, pullFactor));
+  const formMult    = getFormMult(name, hr, gp);
   const weatherMult = 1 + (Math.max(-1, Math.min(1, weatherBoost)) * 0.10);
 
-  // ── Final probability ──
-  // Pull factor: batter handedness × pitcher handedness × field dimensions
-  const pull = Math.max(0.85, Math.min(1.25, pullFactor));
-  const hrProb = Math.min(0.32, (baseRate + opsBoost) * pitcherMult * pf * pull * weatherMult);
+  const hrProb = Math.min(0.34, baseRate * statcastMult * pitcherMult * pf * pull * formMult * weatherMult);
 
   let hits = 0;
   for (let i = 0; i < N; i++) {
@@ -1488,8 +1584,10 @@ export default function App() {
             const simBat = { hr: knownHR||3, gp:33, ops:"0.750" };
             const pitcherForSim = { era: pitcherERA || 4.20 };
             const parkFactor = PARK_FACTORS[gameObj?.venue] || 1.0;
-            const pullFactor = getPullFactor(gameObj?.venue, p.batterHand, p.pitcherHand);
-            const simCount = runHRSimulation(simBat, pitcherForSim, wBoost, 1000, parkFactor, pullFactor);
+            const pullFactor = getPullFactor(gameObj?.venue, batterHand, p.pitcherHand);
+            const enrichedBatter = { ...simBat, name: p.name, avgEV: p.avgEV, avgLA: p.avgLA };
+            const enrichedPitcher = { era: p.pitcherERA || 4.20, hr9: p.pitcherHr9 || 0, hand: p.pitcherHand };
+            const simCount = runHRSimulation(enrichedBatter, enrichedPitcher, wBoost, 1000, parkFactor, pullFactor);
             const weatherInsight = w && w.isOutdoor !== false
               ? w.tempF+"°F · "+w.windSpeed+"mph "+w.windDir+" ("+(w.windVsField||"?")+")"
               : w?.isOutdoor === false ? "Indoor dome" : "";
