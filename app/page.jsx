@@ -498,25 +498,10 @@ const BATTER_IDS = {
 };
 
 const KNOWN_2026_HR = {
-  // Verified through May 3, 2026 — source: SI.com / MLB.com
-  "Aaron Judge":13, "Munetaka Murakami":13, "Yordan Alvarez":12, "Ben Rice":12,
-  "Matt Olson":11,
-  // Estimated from early-season reports (approx May 3)
-  "Mike Trout":9, "Kyle Schwarber":9, "Gunnar Henderson":9,
-  "Pete Alonso":8, "Bryce Harper":8, "Juan Soto":8, "Jordan Walker":8,
-  "Bobby Witt Jr":7, "Vladimir Guerrero Jr":7, "Jose Ramirez":7, "Mookie Betts":7,
-  "Freddie Freeman":7, "Fernando Tatis Jr":7, "Shohei Ohtani":7, "Rafael Devers":7,
-  "Matt Chapman":6, "Elly De La Cruz":6, "Julio Rodriguez":6, "Randy Arozarena":6,
-  "Ian Happ":6, "Jarren Duran":6, "Jackson Chourio":5, "Pete Crow-Armstrong":5,
-  "Alex Bregman":5, "Willy Adames":5, "Byron Buxton":5, "Nolan Arenado":5,
-  "Francisco Lindor":5, "Shea Langeliers":5, "Austin Riley":5, "Manny Machado":5,
-  "Nick Kurtz":4, "James Wood":4, "Vinnie Pasquantino":4, "Salvador Perez":4,
-  "Ketel Marte":4, "Bo Bichette":4, "Riley Greene":4, "William Contreras":4,
-  "Ozzie Albies":4, "Spencer Torkelson":4, "Corbin Carroll":3, "Kerry Carpenter":3,
-  "Tyler Stephenson":3, "Jonathan India":3, "Jake Cronenworth":3, "Oneil Cruz":3,
-  "Jorge Soler":3, "CJ Abrams":3, "Nathaniel Lowe":3, "Adolis Garcia":3,
-  "Jackson Merrill":3, "Jose Altuve":3, "Yainer Diaz":3, "Jeremy Pena":3,
-  "Zach Neto":3, "Taylor Ward":3, "Christian Walker":3, "Liam Hicks":4,
+  // MINIMAL fallback only — real data fetched live from MLB Stats API
+  // Only keeping confirmed top leaders as last-resort fallback
+  "Aaron Judge":13, "Munetaka Murakami":13, "Yordan Alvarez":12,
+  "Ben Rice":12, "Matt Olson":11,
 };
 
 const PLAYER_TEAMS = {
@@ -1841,6 +1826,14 @@ export default function App() {
         ? "✅ Lineups — " + lineupConfirmed + "/" + games.length + " confirmed"
         : "⏳ Lineups not posted yet — batting order TBD");
 
+      // ── Live HR stats from MLB Stats API (real 2026 data) ──
+      setStep("📊 Fetching live HR stats from MLB...");
+      const liveHRMap = await fetchLiveHRStats();
+      const liveCount = Object.keys(liveHRMap).length;
+      setStep(liveCount > 0
+        ? "✅ Live HR data — " + liveCount + " players loaded from MLB API"
+        : "⚠️ HR fetch failed — using fallback");
+
       // ── Attach weather to game objects ──
       setGames(prev => prev.map(g => ({ ...g, weather: weatherMap[g.away+g.home] || null })));
 
@@ -1933,7 +1926,10 @@ export default function App() {
             const pitcher = isHome ? gameObj?.awayP : gameObj?.homeP;
             const pitcherHand = isHome ? gameObj?.awayH : gameObj?.homeH;
             const pitcherERA  = isHome ? gameObj?.awayERA : gameObj?.homeERA;
-            const knownHR  = KNOWN_2026_HR[p.name] ?? KNOWN_2026_HR[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()];
+            // Use live MLB API data first, fall back to hardcoded only if needed
+            const liveEntry = liveHRMap[p.name] ?? liveHRMap[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()];
+            const knownHR   = liveEntry?.hr ?? KNOWN_2026_HR[p.name] ?? KNOWN_2026_HR[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()];
+            const knownGP   = liveEntry?.gp ?? 33;
             const w = weatherMap[key];
             const wBoost = w?.fieldBoost ?? 0;
             const simBat = { hr: knownHR||3, gp:33, ops:"0.750" };
@@ -1947,14 +1943,14 @@ export default function App() {
             const platoonFactor = (bHand && p.pitcherHand && bHand !== p.pitcherHand) ? 1.06 : 0.97;
             const pullFactor = Math.max(0.85, Math.min(1.28, sprayFactor * platoonFactor));
             const enrichedBatter = {
-              hr: knownHR || 3, gp: 33, name: p.name,
+              hr: knownHR || 3, gp: knownGP||33, name: p.name,
               avgEV: p.avgEV || scLookup.avgEV || null,
               avgLA: p.avgLA || scLookup.avgLA || null,
             };
             const enrichedPitcher = { era: p.pitcherERA || 4.20, hr9: 0, hand: p.pitcherHand || "R" };
             const savantBatter  = savantBatters[p.name] || savantBatters[p.name?.replace(/\s+(Jr|Sr)\.?$/i,"").trim()] || {};
             const savantPitcher = savantPitchers[p.pitcher] || savantPitchers[p.pitcher?.replace(/\s+(Jr|Sr)\.?$/i,"").trim()] || {};
-            const simBatter  = { hr: knownHR||3, gp:33, avgEV: savantBatter.avgEV||null, avgLA: savantBatter.avgLA||null };
+            const simBatter  = { hr: knownHR||3, gp:knownGP||33, avgEV: savantBatter.avgEV||null, avgLA: savantBatter.avgLA||null };
             const simPitcher = { era: p.pitcherERA||4.20, hr9: savantPitcher.hr9||0 };
             // Batting order from live lineup
             const gameLineup  = lineupMap?.[key] || {};
@@ -1975,6 +1971,7 @@ export default function App() {
               avgLA: scData.avgLA || null,
               pitcherWhip: null,
               seasonHRs:   knownHR ?? p.seasonHRs ?? null,
+              gamesPlayed: knownGP ?? p.gamesPlayed ?? 33,
               gamesPlayed: 33,
               simHRs:      Math.min(Math.round(simCount), 1000),
               battingPos,
@@ -1997,20 +1994,27 @@ export default function App() {
         const existing = newResults[key]?.players ?? [];
         if (existing.length >= 3) return;
         const w = weatherMap[key];
-        const candidates = Object.entries(KNOWN_2026_HR)
+        // Build candidates from live data + fallback
+        const liveForGame = Object.entries(liveHRMap)
           .filter(([name]) => { const t = PLAYER_TEAMS[name]; return t === g.away || t === g.home; })
+          .map(([name, s]) => [name, s.hr, s.gp]);
+        const fallbackForGame = Object.entries(KNOWN_2026_HR)
+          .filter(([name]) => { const t = PLAYER_TEAMS[name]; return t === g.away || t === g.home; })
+          .map(([name, hr]) => [name, hr, 33]);
+        const allCandidates = liveForGame.length > 0 ? liveForGame : fallbackForGame;
+        const candidates = allCandidates
           .sort((a,b) => b[1]-a[1])
           .slice(0, 6)
-          .map(([name, hr]) => {
+          .map(([name, hr, gp]) => {
             const team = PLAYER_TEAMS[name] || g.away;
             const isHome = team === g.home;
             const pitcher = isHome ? g.awayP : g.homeP;
             const pitcherERA = isHome ? g.awayERA : g.homeERA;
             const pf2 = PARK_FACTORS[g.venue] || 1.0;
             const sb2 = savantBatters?.[name] || {};
-            const sp2 = savantPitchers?.[pitcherName] || {};
+            const sp2 = savantPitchers?.[pitcher] || {};
             const simCount = runHRSimulation(
-              { hr, gp:33, avgEV: sb2.avgEV||null },
+              { hr, gp: gp||33, avgEV: sb2.avgEV||null },
               { era: pitcherERA||4.20, hr9: sp2.hr9||0 },
               w?.fieldBoost??0, 1000, pf2
             );
