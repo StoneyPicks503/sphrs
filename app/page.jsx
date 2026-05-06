@@ -1244,49 +1244,21 @@ export default function App() {
     setPhase("running"); setLogs([]); setErrMsg(""); setProgress(0); setStepLabel("Starting...");
 
     try {
-      setStep("⚾ Loading " + games.length + " game(s)...");
-      await new Promise(r => setTimeout(r, 150));
+      setStep("⚾ Loading " + games.length + " games...");
 
-      // ── Fetch real weather for all stadiums in parallel ──
-      setStep("🌤 Fetching live weather for all " + games.length + " stadiums...");
+      // Weather only — Open-Meteo has no rate limit
+      setStep("🌤 Fetching weather...");
       const weatherMap = await fetchWeatherForGames(games);
       const weatherHits = Object.values(weatherMap).filter(w => w !== null).length;
-      setStep("✅ Weather loaded — " + weatherHits + " stadiums · " + (games.length - weatherHits) + " unavailable");
+      setStep("✅ Weather ready — " + weatherHits + "/" + games.length + " stadiums");
 
-      // ── Fetch LIVE 2026 HR stats from MLB API ──
-      setStep("📊 Fetching live 2026 HR stats from MLB Stats API...");
-      const liveHRMap = await fetchLiveHRStats();
-      const liveCount = Object.keys(liveHRMap).length;
-      setStep(liveCount > 0
-        ? "✅ Live HR data — " + liveCount + " players loaded"
-        : "⚠️ HR fetch failed — using verified fallback");
-
-      // ── Fetch pitcher MLBAM IDs for BvP lookups ──
-      const allPitcherNames = [...new Set(games.map(g => [g.awayP, g.homeP]).flat().filter(p => p && p !== "TBD"))];
-      setStep("⚔️ Fetching pitcher IDs for BvP lookups (" + allPitcherNames.length + " pitchers)...");
-      const pitcherIdMap = await fetchPitcherIds(allPitcherNames);
-      setStep("✅ " + Object.keys(pitcherIdMap).length + " pitcher IDs resolved");
-
-      // BvP cache — populated after we know which batters face which pitchers
+      // Use hardcoded KNOWN_2026_HR + BATTER_IDS — no MLB API calls needed
+      const liveHRMap = {};
+      const pitcherIdMap = PITCHER_IDS; // already hardcoded
       const bvpCache = {};
+      const injuredPlayers = new Set(); // skip injury API to avoid rate limit
 
-      // ── Fetch live injury report ──
-      setStep("🏥 Checking MLB injury report...");
-      const injuredPlayers = await fetchInjuredPlayers();
-      if (injuredPlayers.size > 0) {
-        setStep("🏥 " + injuredPlayers.size + " players on IL — will be excluded from picks");
-      }
-
-      // Log any standout weather
-      Object.entries(weatherMap).forEach(([k, w]) => {
-        if (w && w.hrImpact === "positive") setStep("🌬️ HR weather boost: " + k + " — " + w.summary);
-        if (w && w.hrImpact === "negative") setStep("🧊 HR weather suppress: " + k + " — " + w.summary);
-      });
-
-      await new Promise(r => setTimeout(r, 150));
-      setStep("📊 Analyzing BvP + HR chance % per player...");
-      await new Promise(r => setTimeout(r, 150));
-      setStep("🎲 Running 1,000-game Monte Carlo...");
+      setStep("🎲 Running simulations + Claude analysis...");
       await new Promise(r => setTimeout(r, 150));
 
       // Consolidated game data from all batches
@@ -1314,13 +1286,8 @@ export default function App() {
       })));
 
       for (let b = 0; b < batches.length; b++) {
-        setStep("📡 Pre-fetching real stats for batch " + (b + 1) + " of " + batches.length + "...");
-        const batchGameData = await prefetchGameData(batches[b]);
-        const dataCount = Object.values(batchGameData).filter(Boolean).length;
-        setStep("✅ Real data loaded — " + dataCount + "/" + batches[b].length + " games have live stats");
-
-        setStep("🤖 Analyzing batch " + (b + 1) + " of " + batches.length + " (" + batches[b].length + " games)...");
-        // Store batch game data for post-processing
+        // Skip prefetch — hardcoded data only to avoid rate limits
+        const batchGameData = {};
         Object.assign(allGameData, batchGameData);
 
         if (b > 0) await new Promise(r => setTimeout(r, 500)); // pause between batches
