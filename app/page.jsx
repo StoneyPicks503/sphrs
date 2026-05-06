@@ -1148,186 +1148,186 @@ function buildPrompt(games, weatherMap = {}, gameData = {}) {
 function StadiumWindView({ game, weather }) {
   if (!weather || weather.dome) return null;
 
-  const coords = STADIUM_COORDS[game.venue];
+  const coords    = STADIUM_COORDS[game.venue];
   const cfBearing = coords?.cfBearing ?? 0;
 
-  // Each stadium has a unique outfield wall shape defined as points
-  // Points are relative to center (0,0), scaled to fit 160x160 box
-  // Home plate is always at bottom center (0, 60), CF at top
-  const STADIUM_SHAPES = {
-    "Yankee Stadium": "M-63.6,-0.0 L-75.0,-27.3 L-57.7,-57.7 L-31.9,-75.1 L0.0,-81.6 L30.1,-70.9 L54.4,-54.4 L57.8,-24.5 L62.8,-0.0",
-    "Fenway Park": "M-62.0,-0.0 L-67.5,-21.9 L-62.1,-43.5 L0.0,-84.0 L58.2,-48.9 L57.4,-18.7 L60.4,-0.0",
-    "Wrigley Field": "M-71.0,-0.0 L-63.7,-36.8 L-40.0,-69.3 L0.0,-80.0 L36.8,-63.7 L61.1,-35.3 L70.6,-0.0",
-    "Coors Field": "M-69.4,-0.0 L-67.5,-39.0 L-41.5,-71.9 L0.0,-83.0 L37.5,-65.0 L60.6,-35.0 L70.0,-0.0",
-    "Oracle Park": "M-67.8,-0.0 L-69.2,-32.3 L-51.9,-61.9 L0.0,-79.8 L42.1,-72.9 L56.0,-26.1 L61.8,-0.0",
-    "Petco Park": "M-67.2,-0.0 L-67.5,-39.0 L-41.1,-71.2 L0.0,-79.2 L39.1,-67.7 L58.4,-27.2 L64.4,-0.0",
-    "Angel Stadium": "M-69.4,-0.0 L-67.5,-39.0 L-40.0,-69.3 L0.0,-80.0 L38.6,-66.9 L60.6,-35.0 L69.4,-0.0",
-    "Kauffman Stadium": "M-66.0,-0.0 L-67.0,-38.7 L-41.0,-71.0 L0.0,-82.0 L38.7,-67.0 L57.2,-33.0 L66.0,-0.0",
-    "Busch Stadium": "M-67.2,-0.0 L-65.0,-37.5 L-40.0,-69.3 L0.0,-80.0 L37.5,-65.0 L58.0,-33.5 L67.0,-0.0",
-    "Comerica Park": "M-69.0,-0.0 L-67.1,-31.3 L-49.5,-55.0 L-28.9,-79.3 L0.0,-84.4 L37.9,-65.6 L57.2,-33.0 L66.0,-0.0",
-    "PNC Park": "M-65.0,-0.0 L-71.0,-28.7 L-52.7,-62.8 L0.0,-79.8 L37.5,-65.0 L58.0,-27.0 L64.0,-0.0",
-    "Great American": "M-65.6,-0.0 L-65.6,-37.9 L-40.4,-70.0 L0.0,-80.8 L37.0,-64.1 L56.3,-32.5 L65.0,-0.0",
-    "Nationals Park": "M-67.2,-0.0 L-65.3,-37.7 L-40.2,-69.6 L0.0,-80.4 L37.0,-64.1 L58.0,-33.5 L67.2,-0.0",
-    "Target Field": "M-67.8,-0.0 L-69.9,-28.2 L-51.9,-61.9 L0.0,-80.8 L36.7,-63.6 L60.8,-24.6 L65.6,-0.0",
-    "Citizens Bank Park": "M-65.8,-0.0 L-64.8,-37.4 L-40.1,-69.5 L0.0,-80.2 L36.9,-63.9 L57.2,-33.0 L66.0,-0.0",
-    "Guaranteed Rate": "M-66.0,-0.0 L-65.0,-37.5 L-40.0,-69.3 L0.0,-80.0 L37.5,-65.0 L58.0,-33.5 L67.0,-0.0",
-    "Truist Park": "M-67.0,-0.0 L-65.0,-37.5 L-40.0,-69.3 L0.0,-80.0 L37.5,-65.0 L56.3,-32.5 L65.0,-0.0",
-    "Sutter Health Park": "M-66.0,-0.0 L-65.0,-37.5 L-40.0,-69.3 L0.0,-80.0 L37.5,-65.0 L57.2,-33.0 L66.0,-0.0",
-    "Chase Field": "M-66.0,-0.0 L-64.8,-37.4 L-40.7,-70.5 L0.0,-81.4 L37.4,-64.8 L57.9,-33.4 L66.8,-0.0",
+  // Outfield wall paths — polar coords (angle°, ft) → scaled SVG
+  // angle: 0=LF line, 90=CF, 180=RF line; scale 0.185
+  const scale = 0.185;
+  function polar(angleDeg, ft) {
+    const r = (angleDeg - 90) * Math.PI / 180;
+    return [parseFloat((Math.sin(r) * ft * scale).toFixed(1)),
+            parseFloat((-Math.cos(r) * ft * scale).toFixed(1))];
+  }
+
+  const WALLS = {
+    "Yankee Stadium":    [[0,318],[20,399],[45,408],[67,408],[90,408],[113,385],[135,385],[157,314],[180,314]],
+    "Fenway Park":       [[0,310],[18,355],[35,379],[90,420],[140,380],[162,302],[180,302]],
+    "Wrigley Field":     [[0,355],[30,368],[60,400],[90,400],[120,368],[150,353],[180,353]],
+    "Coors Field":       [[0,347],[30,390],[60,415],[90,415],[120,375],[150,350],[180,350]],
+    "Oracle Park":       [[0,339],[25,382],[50,404],[90,399],[120,421],[155,309],[180,309]],
+    "Petco Park":        [[0,336],[30,390],[60,411],[90,396],[120,391],[155,322],[180,322]],
+    "Angel Stadium":     [[0,347],[30,390],[60,400],[90,400],[120,386],[150,350],[180,347]],
+    "Kauffman Stadium":  [[0,330],[30,387],[60,410],[90,410],[120,387],[150,330],[180,330]],
+    "Busch Stadium":     [[0,336],[30,375],[60,400],[90,400],[120,375],[150,335],[180,335]],
+    "Comerica Park":     [[0,345],[25,370],[48,370],[70,422],[90,422],[120,379],[150,330],[180,330]],
+    "PNC Park":          [[0,325],[22,383],[50,410],[90,399],[120,375],[155,320],[180,320]],
+    "Great American":    [[0,328],[30,379],[60,404],[90,404],[120,370],[150,325],[180,325]],
+    "Nationals Park":    [[0,336],[30,377],[60,402],[90,402],[120,370],[150,335],[180,336]],
+    "Target Field":      [[0,339],[22,377],[50,404],[90,404],[120,367],[158,328],[180,328]],
+    "Citizens Bank Park":[[0,329],[30,374],[60,401],[90,401],[120,369],[150,330],[180,330]],
+    "Guaranteed Rate":   [[0,330],[30,375],[60,400],[90,400],[120,375],[150,335],[180,335]],
+    "Truist Park":       [[0,335],[30,375],[60,400],[90,400],[120,375],[150,325],[180,325]],
+    "Sutter Health Park":[[0,330],[30,375],[60,400],[90,400],[120,375],[150,330],[180,330]],
+    "Chase Field":       [[0,330],[30,374],[60,407],[90,407],[120,374],[150,334],[180,334]],
   };
 
-  const size = 200;
-  const cx = 100;
-  const cy = 95;  // center of field; HP will be at cy+48
+  const wallPts = WALLS[game.venue] || WALLS["Kauffman Stadium"];
+  const SVG_W = 220, SVG_H = 200;
+  const cx = SVG_W / 2, cy = SVG_H / 2 + 18;  // HP area
+
+  // Build wall path string (relative to origin, then translate)
+  const wallCoords = wallPts.map(([a, d]) => polar(a, d));
+  const wallPath = wallCoords.map(([x,y], i) =>
+    (i === 0 ? "M" : "L") + (cx+x) + "," + (cy+y)
+  ).join(" ") + " Z";
+
+  // Warning track (scale inward by ~30ft)
+  const trackCoords = wallPts.map(([a, d]) => polar(a, Math.max(d - 30, d * 0.92)));
+  const trackPath = trackCoords.map(([x,y], i) =>
+    (i === 0 ? "M" : "L") + (cx+x) + "," + (cy+y)
+  ).join(" ") + " Z";
+
+  // Wind math — where wind is going (arrow direction)
+  const windFrom = typeof weather.windDeg === "number" ? weather.windDeg : 0;
+  const windTo   = (windFrom + 180) % 360;
+  // Wind direction on screen (field rotated so CF faces up)
+  const screenAngle = (windTo - cfBearing - 90) * Math.PI / 180;
+  const wdx = Math.cos(screenAngle);
+  const wdy = Math.sin(screenAngle);
+
+  const wColor = weather.hrImpact === "positive" ? "#ff6a00"
+               : weather.hrImpact === "negative" ? "#5ab4ff"
+               : "#8899aa";
+
+  // Scatter wind arrows across field (like reference image)
+  const arrowPositions = [
+    [0, -52], [-28, -38], [28, -38],
+    [-45, -18], [45, -18],
+    [-30, 5],  [30, 5],
+    [0, -22], [-15, -58], [15, -58],
+    [-52, -5], [52, -5],
+  ];
+  const aLen = weather.windSpeed <= 2 ? 6 : Math.min(14, 6 + weather.windSpeed * 0.5);
+  const markerId = "wm-" + game.away + game.home;
+
+  // Infield
+  const ifR = 26;
+  const hp = [cx, cy + 8];
+  const first  = [cx + ifR * 0.7, cy + 8 - ifR * 0.7];
+  const second = [cx, cy + 8 - ifR * 1.4];
+  const third  = [cx - ifR * 0.7, cy + 8 - ifR * 0.7];
+
   const fieldRotation = -cfBearing;
 
-  // Wind arrow direction — meteorological convention: windDeg = direction FROM
-  const windFrom = typeof weather.windDeg === "number" ? weather.windDeg : 0;
-  const windTo   = (windFrom + 180) % 360;          // direction wind is GOING
-  const windArrowAngle = windTo - cfBearing;          // relative to field's CF direction
-  const windRad  = (windArrowAngle - 90) * (Math.PI / 180);
-  const arrowLen = 48;
-  const ax  = cx + Math.cos(windRad) * arrowLen;
-  const ay  = cy + Math.sin(windRad) * arrowLen;
-  const ax2 = cx - Math.cos(windRad) * 16;
-  const ay2 = cy - Math.sin(windRad) * 16;
-
-  const wColor = weather.hrImpact === "positive" ? "#00e676"
-               : weather.hrImpact === "negative" ? "#ff5252" : "#7a9abf";
-  const markerId = "arr-" + game.away + game.home;
-  const gradId   = "fld-" + game.away + game.home;
-
-  // Stadium outfield wall path (offset to cx,cy center)
-  const wallPath = STADIUM_SHAPES[game.venue] ||
-    "M-52,50 L-65,8 L-60,-28 L-42,-55 L0,-70 L42,-55 L60,-28 L65,8 L52,50";
-
-  // Translate path to cx,cy
-  // Paths are relative to (0,0)=HP; translate to (cx, hpY) in SVG
-  const hpOffY = cy + 48;
-  const translated = wallPath.replace(/(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/g,
-    (_, x, y) => (parseFloat(x)+cx) + "," + (parseFloat(y)+hpOffY));
-
-  // Infield diamond points (relative to cx,cy with HP at bottom)
-  // Infield scaled to match outfield (scale 0.20: 90ft base = 18 units)
-  const hpX = cx, hpY = cy + 48;
-  const firstX = cx + 18, firstY = cy + 30;
-  const secondX = cx, secondY = cy + 12;
-  const thirdX = cx - 18, thirdY = cy + 30;
-  const pitchX = cx, pitchY = cy + 22;
-
-  // Pre-compute warning track path (scaled inward by 8 units)
-  const warningPath = translated.replace(
-    new RegExp("(-?[0-9.]+),(-?[0-9.]+)", "g"),
-    function(_, x, y) {
-      const dx = parseFloat(x) - cx;
-      const dy = parseFloat(y) - hpOffY;
-      const dist = Math.sqrt(dx*dx + dy*dy);
-      if (dist < 5) return x + "," + y;
-      const s = (dist - 8) / dist;
-      return (cx + dx*s) + "," + (hpOffY + dy*s);
-    }
-  );
-
   return (
-    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", padding:"8px 0 4px" }}>
-      <div style={{ fontFamily:F.mono, fontSize:8, letterSpacing:2, color:"#4a5a72", marginBottom:4 }}>
-        STADIUM WIND VIEW
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", padding:"6px 0 2px" }}>
+      <div style={{ fontFamily:F.mono, fontSize:7, letterSpacing:3, color:"#3a4a5a", marginBottom:3 }}>
+        WIND FIELD · {game.venue.toUpperCase()}
       </div>
 
-      <div style={{ position:"relative", width:size, height:size }}>
-        <svg width={size} height={size} style={{ overflow:"visible" }}>
-          <defs>
-            <marker id={markerId} markerWidth="8" markerHeight="8" refX="6" refY="2" orient="auto">
-              <path d="M0,0 L0,4 L8,2 z" fill={wColor} />
-            </marker>
-            <radialGradient id={gradId} cx="50%" cy="55%" r="55%">
-              <stop offset="0%" stopColor="#1e4d1e" />
-              <stop offset="100%" stopColor="#0d2a0d" />
-            </radialGradient>
-          </defs>
+      <svg width={SVG_W} height={SVG_H} style={{ overflow:"visible" }}>
+        <defs>
+          <marker id={markerId} markerWidth="5" markerHeight="5" refX="4" refY="1.5" orient="auto">
+            <path d="M0,0 L0,3 L5,1.5 z" fill={wColor} />
+          </marker>
+        </defs>
 
-          {/* Rotate entire field so CF faces up */}
-          <g transform={"rotate(" + fieldRotation + "," + cx + "," + cy + ")"}>
+        {/* Rotate entire field to match cfBearing */}
+        <g transform={`rotate(${fieldRotation},${cx},${cy})`}>
 
-            {/* Outfield wall — stadium specific shape */}
-            <path d={translated + " Z"} fill={"url(#" + gradId + ")"} stroke="#2a5a2a" strokeWidth="1.5" />
+          {/* Outfield wall — orange outline like reference */}
+          <path d={wallPath} fill="#0d1f0d" stroke={wColor} strokeWidth="2" opacity="0.9" />
 
-            {/* Warning track */}
-            <path d={warningPath + " Z"} fill="none" stroke="#5a3a1a" strokeWidth="7" opacity="0.5" />
+          {/* Warning track */}
+          <path d={trackPath} fill="#2a1a08" stroke="#3a2a10" strokeWidth="0" />
 
-            {/* Infield grass circle */}
-            <circle cx={cx} cy={cy + 30} r={28} fill="#1a4d1a" />
+          {/* Outfield grass */}
+          <path d={trackPath} fill="#0f2a0f" />
 
-            {/* Infield dirt */}
-            <polygon points={[hpX+","+hpY, firstX+","+firstY, secondX+","+secondY, thirdX+","+thirdY].join(" ")}
-              fill="#7a4a20" stroke="#5a3a10" strokeWidth="1" />
+          {/* Infield dirt */}
+          <polygon
+            points={`${hp[0]},${hp[1]} ${first[0]},${first[1]} ${second[0]},${second[1]} ${third[0]},${third[1]}`}
+            fill="#3a1f08" stroke="#2a1505" strokeWidth="1"
+          />
 
-            {/* Pitchers mound */}
-            <circle cx={pitchX} cy={pitchY} r={5} fill="#7a4a20" />
+          {/* Infield grass circle */}
+          <circle cx={cx} cy={cy - 10} r={19} fill="#0f2a0f" />
 
-            {/* Bases */}
-            {[[hpX,hpY],[firstX,firstY],[secondX,secondY],[thirdX,thirdY]].map(([bx,by],i) => (
-              <rect key={i} x={bx-3.5} y={by-3.5} width={7} height={7}
-                fill="#f0e0a0" rx={1} stroke="#c0a060" strokeWidth="0.5" />
-            ))}
+          {/* Pitching rubber */}
+          <rect x={cx-3} y={cy-16} width={6} height={2.5} fill="#c8b878" rx={0.5} />
 
-            {/* Foul lines */}
-            <line x1={hpX} y1={hpY} x2={cx-72} y2={cy-30}
-              stroke="#e8d8a0" strokeWidth="1" strokeDasharray="4,3" opacity="0.5"/>
-            <line x1={hpX} y1={hpY} x2={cx+72} y2={cy-30}
-              stroke="#e8d8a0" strokeWidth="1" strokeDasharray="4,3" opacity="0.5"/>
+          {/* Bases */}
+          {[hp, first, second, third].map(([bx,by], i) => (
+            <rect key={i} x={bx-3} y={by-3} width={6} height={6}
+              fill={i===0?"#c8b878":"white"} rx={0.5} opacity={0.9} />
+          ))}
 
-            {/* CF label */}
-            <text x={cx} y={cy-80} textAnchor="middle"
-              fontFamily="monospace" fontSize={7} fill="#4a6a4a" letterSpacing={1}>CF</text>
+          {/* Foul lines */}
+          <line x1={hp[0]} y1={hp[1]} x2={cx-70} y2={cy-45}
+            stroke="#c8b878" strokeWidth="0.8" opacity="0.35" strokeDasharray="3,4" />
+          <line x1={hp[0]} y1={hp[1]} x2={cx+70} y2={cy-45}
+            stroke="#c8b878" strokeWidth="0.8" opacity="0.35" strokeDasharray="3,4" />
 
-            {/* Field dimensions text */}
-            <text x={cx} y={cy-67} textAnchor="middle"
-              fontFamily="monospace" fontSize={6} fill="#3a5a3a">
-              {coords?.cfBearing != null ? windDegToDir(cfBearing) : ""}
-            </text>
-          </g>
+          {/* Scattered wind arrows across field */}
+          {weather.windSpeed > 1 && arrowPositions.map(([ox, oy], i) => {
+            const sx = cx + ox, sy = cy + oy;
+            const ex = sx + wdx * aLen, ey = sy + wdy * aLen;
+            return (
+              <line key={i} x1={sx} y1={sy} x2={ex} y2={ey}
+                stroke={wColor} strokeWidth={1.2}
+                markerEnd={`url(#${markerId})`}
+                opacity={0.55 + (i % 3) * 0.12}
+              />
+            );
+          })}
 
-          {/* Wind arrow — compass-fixed, not rotated */}
-          {weather.windSpeed > 2 && (
-            <line x1={ax2} y1={ay2} x2={ax} y2={ay}
-              stroke={wColor} strokeWidth={weather.windSpeed > 10 ? 3.5 : 2}
-              markerEnd={"url(#" + markerId + ")"}
-              strokeLinecap="round" />
+          {/* Calm indicator */}
+          {weather.windSpeed <= 1 && (
+            <circle cx={cx} cy={cy-25} r={22}
+              fill="none" stroke={wColor} strokeWidth={1}
+              strokeDasharray="3,4" opacity={0.4} />
           )}
-          {weather.windSpeed <= 2 && (
-            <circle cx={cx} cy={cy} r={18} fill="none" stroke={wColor}
-              strokeWidth={1.5} strokeDasharray="3,3" opacity={0.6} />
-          )}
+        </g>
 
-          {/* Wind speed label */}
-          {weather.windSpeed > 2 && (
-            <text x={(ax+ax2)/2 + (Math.cos(windRad)>0?9:-9)}
-              y={(ay+ay2)/2} fontFamily="monospace" fontSize={8}
-              fill={wColor} textAnchor={Math.cos(windRad)>0?"start":"end"}>
-              {weather.windSpeed}mph
-            </text>
-          )}
+        {/* Wind speed label — not rotated */}
+        {weather.windSpeed > 1 && (
+          <text x={SVG_W - 4} y={14} textAnchor="end"
+            fontFamily="monospace" fontSize={8} fill={wColor} opacity={0.85}>
+            {weather.windSpeed}mph {weather.windDir}
+          </text>
+        )}
 
-          {/* Compass N */}
-          <g transform={"translate(" + (size-16) + ",14)"}>
-            <text x={0} y={-4} textAnchor="middle" fontFamily="monospace" fontSize={7} fill="#2a3a52">N</text>
-            <line x1={0} y1={-2} x2={0} y2={5} stroke="#2a3a52" strokeWidth={1}/>
-            <line x1={-4} y1={1} x2={4} y2={1} stroke="#2a3a52" strokeWidth={1}/>
-          </g>
-        </svg>
-      </div>
+        {/* Compass N — not rotated */}
+        <g transform={`translate(10,14)`}>
+          <text x={0} y={0} textAnchor="middle" fontFamily="monospace" fontSize={7} fill="#2a3a4a">N</text>
+          <line x1={0} y1={2} x2={0} y2={8} stroke="#2a3a4a" strokeWidth={1} />
+          <line x1={-4} y1={5} x2={4} y2={5} stroke="#2a3a4a" strokeWidth={1} />
+        </g>
 
-      {/* Wind info */}
-      <div style={{ fontFamily:F.mono, fontSize:9, color:wColor, marginTop:3, textAlign:"center", letterSpacing:1 }}>
-        {weather.windSpeed <= 2
-          ? "CALM — minimal wind effect"
-          : weather.windSpeed + "mph from " + weather.windDir + " · " + (weather.windVsField || "?")}
-      </div>
-      <div style={{ fontFamily:F.mono, fontSize:8, color:"#4a5a72", marginTop:2, textAlign:"center" }}>
-        {weather.hrImpact === "positive" ? "🚀 Wind OUT — HR boost"
-       : weather.hrImpact === "negative" ? "🛑 Wind IN — HR suppressed"
-       : "➡️ Crosswind — neutral"}
+        {/* Temp */}
+        <text x={SVG_W/2} y={SVG_H - 2} textAnchor="middle"
+          fontFamily="monospace" fontSize={8} fill="#3a4a5a">
+          {weather.tempF}°F
+        </text>
+      </svg>
+
+      {/* Impact label */}
+      <div style={{ fontFamily:F.mono, fontSize:8, color:wColor, marginTop:1, textAlign:"center", letterSpacing:1 }}>
+        {weather.windSpeed <= 1 ? "CALM — no wind effect"
+         : weather.hrImpact === "positive" ? "🚀 Wind OUT — HR boost"
+         : weather.hrImpact === "negative" ? "🛑 Wind IN — HR suppressed"
+         : "➡️ Crosswind — neutral"}
       </div>
     </div>
   );
