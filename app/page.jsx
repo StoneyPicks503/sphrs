@@ -889,7 +889,7 @@ function PlayerRow({ p, rank, delay = 0 }) {
             <div style={{ background:"rgba(255,202,40,0.07)", border:"1px solid rgba(255,202,40,0.25)", borderRadius:8, padding:"8px 12px" }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: (p.bvpAB > 0 || p.pitcherArsenal?.length > 0) ? 8 : 0 }}>
                 <span style={{ fontFamily:F.mono, fontSize:9, color:T.amber, letterSpacing:1 }}>
-                  vs {(p.pitcher||"Pitcher")} {p.pitcherHand ? "("+p.pitcherHand+")" : ""} ERA {p.pitcherERA ?? "N/A"}
+                  vs {(p.pitcher||"Pitcher")} {p.pitcherHand ? "("+p.pitcherHand+")" : ""} ERA {p.pitcherERA != null ? parseFloat(p.pitcherERA).toFixed(2) : "N/A"}
                   <span style={{ color:"#00e676", fontSize:7, marginLeft:5 }}>● LIVE</span>
                 </span>
                 <span style={{ fontFamily:F.mono, fontSize:11, color:T.text }}>
@@ -1028,6 +1028,8 @@ function GameCard({ game, result, isOpen, onToggle, onRemove, isRunning }) {
       {/* Expanded content */}
       {isOpen && (
         <div style={{ padding: "10px 12px 12px", borderTop: "1px solid " + T.border }}>
+          {/* Stadium wind view — shows real wind direction on field */}
+          {!isRunning && game.weather && <StadiumWindView game={game} weather={game.weather} />}
           {isRunning && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 0", fontFamily: F.mono, fontSize: 11, color: T.accent, animation: "hrs-blink 1.4s ease infinite" }}>
               <Spin size={12} /> Analyzing matchups...
@@ -1140,6 +1142,158 @@ function buildPrompt(games, weatherMap = {}, gameData = {}) {
   ].join("\n");
 }
 
+
+
+/* ════════ STADIUM WIND VIEW ════════ */
+function StadiumWindView({ game, weather }) {
+  if (!weather || weather.dome) return null;
+
+  const size    = 180;
+  const cx      = size / 2;
+  const cy      = size / 2 + 20;
+  const radius  = 68;
+
+  // cfBearing = compass direction home plate faces toward CF
+  // We rotate the entire field so CF always points "up" visually
+  // then overlay the wind arrow in its real compass direction
+  const coords = STADIUM_COORDS[game.venue];
+  const cfBearing = coords?.cfBearing ?? 0;
+
+  // Wind comes FROM windDeg, goes TOWARD windDeg+180
+  const windFrom  = weather.windDeg ?? 0;
+  const windTo    = (windFrom + 180) % 360;
+
+  // Arrow direction on screen:
+  // Field is rotated so CF (cfBearing) points UP (-90deg from east)
+  // Wind arrow needs to be rotated by (windTo - cfBearing) relative to field
+  const fieldRotation  = -cfBearing; // rotate field so CF faces up
+  const windArrowAngle = windTo - cfBearing; // wind direction relative to field orientation
+  const windRad        = (windArrowAngle - 90) * (Math.PI / 180);
+
+  // Arrow endpoints
+  const arrowLen  = 44;
+  const ax        = cx + Math.cos(windRad) * arrowLen;
+  const ay        = cy + Math.sin(windRad) * arrowLen;
+  const ax2       = cx - Math.cos(windRad) * (arrowLen * 0.3);
+  const ay2       = cy - Math.sin(windRad) * (arrowLen * 0.3);
+
+  // Color by HR impact
+  const wColor = weather.hrImpact === "positive" ? "#00e676"
+               : weather.hrImpact === "negative" ? "#ff5252"
+               : "#7a9abf";
+
+  // Wind speed opacity for arrow
+  const arrowOpacity = Math.min(1, 0.4 + (weather.windSpeed / 20) * 0.6);
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", padding:"10px 0 6px" }}>
+      <div style={{ fontFamily:F.mono, fontSize:8, letterSpacing:2, color:"#4a5a72", marginBottom:6 }}>
+        STADIUM WIND VIEW
+      </div>
+      <svg width={size} height={size} style={{ overflow:"visible" }}>
+        <defs>
+          <marker id={"arrow-" + game.away + game.home} markerWidth="8" markerHeight="8"
+            refX="4" refY="2" orient="auto">
+            <path d="M0,0 L0,4 L8,2 z" fill={wColor} opacity={arrowOpacity} />
+          </marker>
+          <radialGradient id={"field-" + game.away + game.home} cx="50%" cy="60%" r="50%">
+            <stop offset="0%" stopColor="#1a4a1a" />
+            <stop offset="100%" stopColor="#0d2a0d" />
+          </radialGradient>
+        </defs>
+
+        {/* Rotate entire field so CF faces up */}
+        <g transform={"rotate(" + fieldRotation + "," + cx + "," + cy + ")"}>
+
+          {/* Outfield arc */}
+          <path d={"M " + (cx - radius) + " " + cy +
+            " A " + radius + " " + radius + " 0 0 1 " + (cx + radius) + " " + cy +
+            " L " + cx + " " + (cy - radius * 0.55) + " Z"}
+            fill={"url(#field-" + game.away + game.home + ")"}
+            stroke="#1e3a1e" strokeWidth="1" />
+
+          {/* Infield dirt diamond */}
+          <polygon
+            points={[
+              cx + "," + (cy - 36),         // 2B (top)
+              (cx + 28) + "," + cy,          // 1B (right)
+              cx + "," + (cy + 28),          // HP (bottom)
+              (cx - 28) + "," + cy,          // 3B (left)
+            ].join(" ")}
+            fill="#5a3a1a" stroke="#4a3010" strokeWidth="1" />
+
+          {/* Infield grass */}
+          <circle cx={cx} cy={cy - 4} r={22} fill="#1a4a1a" />
+
+          {/* Base paths */}
+          {[[cx, cy-36],[cx+28,cy],[cx,cy+28],[cx-28,cy]].map(([bx,by],i) => (
+            <rect key={i} x={bx-3} y={by-3} width={6} height={6}
+              fill="#e8d5a0" rx={1} />
+          ))}
+
+          {/* Pitching rubber */}
+          <rect x={cx-4} y={cy-11} width={8} height={3} fill="#e8d5a0" rx={1} />
+
+          {/* Foul lines */}
+          <line x1={cx} y1={cy+28} x2={cx - radius * 0.72} y2={cy - radius * 0.72}
+            stroke="#e8d5a0" strokeWidth="0.8" strokeDasharray="3,3" opacity={0.5} />
+          <line x1={cx} y1={cy+28} x2={cx + radius * 0.72} y2={cy - radius * 0.72}
+            stroke="#e8d5a0" strokeWidth="0.8" strokeDasharray="3,3" opacity={0.5} />
+
+          {/* CF label */}
+          <text x={cx} y={cy - radius + 2} textAnchor="middle"
+            fontFamily="monospace" fontSize={8} fill="#4a5a72" letterSpacing={1}>CF</text>
+
+          {/* HP label */}
+          <text x={cx} y={cy + 42} textAnchor="middle"
+            fontFamily="monospace" fontSize={8} fill="#4a5a72">HP</text>
+        </g>
+
+        {/* Wind arrow — NOT rotated with field, stays in compass orientation */}
+        <line
+          x1={ax2} y1={ay2} x2={ax} y2={ay}
+          stroke={wColor} strokeWidth={weather.windSpeed > 8 ? 3 : 2}
+          opacity={arrowOpacity}
+          markerEnd={"url(#arrow-" + game.away + game.home + ")"}
+          strokeLinecap="round"
+        />
+
+        {/* Wind speed label on arrow */}
+        <text
+          x={(ax + ax2) / 2 + 8} y={(ay + ay2) / 2}
+          fontFamily="monospace" fontSize={8}
+          fill={wColor} opacity={0.9}
+        >{weather.windSpeed}mph</text>
+
+        {/* Calm wind indicator */}
+        {weather.windSpeed <= 3 && (
+          <circle cx={cx} cy={cy - 10} r={16}
+            fill="none" stroke={wColor} strokeWidth={1.5}
+            strokeDasharray="3,3" opacity={0.5} />
+        )}
+
+        {/* Compass rose (small) */}
+        <g transform={"translate(" + (size - 18) + ",18)"}>
+          <text x={0} y={-6} textAnchor="middle" fontFamily="monospace" fontSize={7} fill="#2a3a52">N</text>
+          <line x1={0} y1={-4} x2={0} y2={5} stroke="#2a3a52" strokeWidth={1} />
+          <line x1={-5} y1={0} x2={4} y2={0} stroke="#2a3a52" strokeWidth={1} />
+        </g>
+      </svg>
+
+      {/* Wind info */}
+      <div style={{ fontFamily:F.mono, fontSize:9, color:wColor, marginTop:2, textAlign:"center", letterSpacing:1 }}>
+        {weather.windSpeed <= 3
+          ? "CALM — minimal wind effect"
+          : weather.windSpeed + "mph from " + weather.windDir + " · " + (weather.windVsField || "?")}
+      </div>
+      <div style={{ fontFamily:F.mono, fontSize:8, color:"#4a5a72", marginTop:2, textAlign:"center" }}>
+        {weather.hrImpact === "positive" ? "🚀 Wind blowing OUT — HR boost"
+       : weather.hrImpact === "negative" ? "🛑 Wind blowing IN — HR suppressed"
+       : "➡️ Crosswind — neutral HR impact"}
+      </div>
+    </div>
+  );
+}
 
 /* ════════ TOP 3 PARLAY BANNER ════════ */
 function ParlayBanner({ results }) {
