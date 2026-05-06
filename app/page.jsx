@@ -429,6 +429,57 @@ const BATTER_IDS = {
   "Ezequiel Tovar":678662,"Brenton Doyle":684597,"Ryan McMahon":641943,
 };
 
+const KNOWN_2026_HR = {
+  "Aaron Judge":13,"Munetaka Murakami":13,"Yordan Alvarez":12,"Ben Rice":12,
+  "Matt Olson":11,"Mike Trout":9,"Kyle Schwarber":9,"Gunnar Henderson":9,
+  "Pete Alonso":8,"Bryce Harper":8,"Juan Soto":8,"Jordan Walker":8,
+  "Bobby Witt Jr":7,"Vladimir Guerrero Jr":7,"Jose Ramirez":7,"Mookie Betts":7,
+  "Freddie Freeman":7,"Fernando Tatis Jr":7,"Shohei Ohtani":7,"Rafael Devers":7,
+  "Matt Chapman":6,"Elly De La Cruz":6,"Julio Rodriguez":6,"Randy Arozarena":6,
+  "Ian Happ":6,"Jarren Duran":6,"Jackson Chourio":5,"Pete Crow-Armstrong":5,
+  "Alex Bregman":5,"Willy Adames":5,"Byron Buxton":5,"Nolan Arenado":5,
+  "Francisco Lindor":5,"Shea Langeliers":5,"Austin Riley":5,"Manny Machado":5,
+  "Nick Kurtz":4,"James Wood":4,"Vinnie Pasquantino":4,"Salvador Perez":4,
+  "Ketel Marte":4,"Bo Bichette":4,"Riley Greene":4,"William Contreras":4,
+  "Ozzie Albies":4,"Jorge Soler":4,"Spencer Torkelson":4,"Corbin Carroll":3,
+  "Kerry Carpenter":3,"Tyler Stephenson":3,"Jonathan India":3,"Jake Cronenworth":3,
+};
+
+const PLAYER_TEAMS = {
+  "Aaron Judge":"NYY","Ben Rice":"NYY","Paul Goldschmidt":"NYY","Cody Bellinger":"NYY",
+  "Jazz Chisholm":"NYY","Anthony Volpe":"NYY","Gleyber Torres":"NYY","Austin Wells":"NYY",
+  "Juan Soto":"NYM","Francisco Lindor":"NYM","Mark Vientos":"NYM","Brandon Nimmo":"NYM",
+  "Bryce Harper":"PHI","Kyle Schwarber":"PHI","Trea Turner":"PHI","Nick Castellanos":"PHI",
+  "Shohei Ohtani":"LAD","Mookie Betts":"LAD","Freddie Freeman":"LAD","Max Muncy":"LAD",
+  "Yordan Alvarez":"HOU","Jose Altuve":"HOU","Jeremy Pena":"HOU","Yainer Diaz":"HOU",
+  "Rafael Devers":"SF","Willy Adames":"SF","Matt Chapman":"SF","Heliot Ramos":"SF",
+  "Matt Olson":"ATL","Austin Riley":"ATL","Ozzie Albies":"ATL","Sean Murphy":"ATL",
+  "Pete Alonso":"BAL","Gunnar Henderson":"BAL","Adley Rutschman":"BAL","Colton Cowser":"BAL",
+  "Jose Ramirez":"CLE","Steven Kwan":"CLE","Josh Naylor":"CLE","Lane Thomas":"CLE",
+  "Bobby Witt Jr":"KC","Vinnie Pasquantino":"KC","Salvador Perez":"KC","MJ Melendez":"KC",
+  "Alex Bregman":"BOS","Jarren Duran":"BOS","Triston Casas":"BOS","Wilyer Abreu":"BOS",
+  "Vladimir Guerrero Jr":"TOR","Bo Bichette":"TOR","George Springer":"TOR",
+  "Julio Rodriguez":"SEA","Randy Arozarena":"SEA","Cal Raleigh":"SEA",
+  "Fernando Tatis Jr":"SD","Manny Machado":"SD","Jackson Merrill":"SD",
+  "Munetaka Murakami":"CWS","Andrew Vaughn":"CWS","Korey Lee":"CWS",
+  "Mike Trout":"LAA","Taylor Ward":"LAA","Zach Neto":"LAA",
+  "Jackson Chourio":"MIL","William Contreras":"MIL","Christian Yelich":"MIL",
+  "Nolan Arenado":"STL","Jordan Walker":"STL","Lars Nootbaar":"STL",
+  "Elly De La Cruz":"CIN","Tyler Stephenson":"CIN","Jonathan India":"CIN",
+  "Ian Happ":"CHC","Pete Crow-Armstrong":"CHC","Seiya Suzuki":"CHC","Dansby Swanson":"CHC",
+  "Byron Buxton":"MIN","Carlos Correa":"MIN","Ryan Jeffers":"MIN",
+  "James Wood":"WSH","CJ Abrams":"WSH","Keibert Ruiz":"WSH",
+  "Nick Kurtz":"ATH","Shea Langeliers":"ATH","Brent Rooker":"ATH",
+  "Ketel Marte":"AZ","Corbin Carroll":"AZ","Christian Walker":"AZ",
+  "Oneil Cruz":"PIT","Bryan Reynolds":"PIT","Nick Gonzales":"PIT",
+  "Riley Greene":"DET","Spencer Torkelson":"DET","Kerry Carpenter":"DET",
+  "Jorge Soler":"MIA","Luis Arraez":"MIA","Jake Burger":"MIA",
+  "Junior Caminero":"TB","Yandy Diaz":"TB","Josh Lowe":"TB",
+  "Nathaniel Lowe":"TEX","Adolis Garcia":"TEX","Wyatt Langford":"TEX",
+  "Francisco Lindor":"NYM","Pete Crow-Armstrong":"CHC","Randy Arozarena":"SEA",
+};
+
+
 async function fetchPitcherIds(pitcherNames) {
   const idMap = {};
   // First use hardcoded IDs
