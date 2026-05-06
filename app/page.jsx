@@ -1638,30 +1638,46 @@ function ParlayBanner({ results }) {
           transform:open?"rotate(180deg)":"rotate(0)", transition:"transform .2s" }}>▼</div>
       </div>
 
-      {/* Slide dots */}
-      <div style={{ display:"flex", justifyContent:"center", gap:6, padding:"6px 0 0" }}>
-        {PARLAYS.map((pl, i) => (
-          <div key={i} onClick={() => setSlide(i)} style={{
-            width: i===slide ? 20 : 6, height:6, borderRadius:3,
-            background: i===slide ? pl.color : T.border,
-            cursor:"pointer", transition:"all .25s",
-          }} />
-        ))}
+      {/* Navigation — always visible, not inside collapsible */}
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 16px 4px" }}>
+        <button
+          onClick={e => { e.stopPropagation(); setSlide(s => Math.max(0,s-1)); }}
+          style={{ background: slide>0 ? current.color+"22" : "transparent",
+            border: "1px solid " + (slide>0 ? current.color+"66" : T.border),
+            color: slide>0 ? current.color : T.border,
+            borderRadius:8, fontSize:16, cursor:slide>0?"pointer":"default",
+            padding:"4px 12px", fontWeight:"bold", transition:"all .2s" }}>
+          ‹
+        </button>
+
+        {/* Dots */}
+        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+          {PARLAYS.map((pl, i) => (
+            <div key={i} onClick={() => setSlide(i)} style={{
+              width: i===slide ? 24 : 8, height:8, borderRadius:4,
+              background: i===slide ? pl.color : T.border,
+              cursor:"pointer", transition:"all .3s",
+              boxShadow: i===slide ? "0 0 8px "+pl.color+"88" : "none",
+            }} />
+          ))}
+        </div>
+
+        <button
+          onClick={e => { e.stopPropagation(); setSlide(s => Math.min(2,s+1)); }}
+          style={{ background: slide<2 ? current.color+"22" : "transparent",
+            border: "1px solid " + (slide<2 ? current.color+"66" : T.border),
+            color: slide<2 ? current.color : T.border,
+            borderRadius:8, fontSize:16, cursor:slide<2?"pointer":"default",
+            padding:"4px 12px", fontWeight:"bold", transition:"all .2s" }}>
+          ›
+        </button>
       </div>
 
       {/* Players */}
       {open && (
-        <div style={{ padding:"8px 14px 14px" }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-            <button onClick={() => setSlide(s => Math.max(0,s-1))}
-              style={{ background:"transparent", border:"none", color:slide>0?current.color:T.border,
-                fontSize:18, cursor:slide>0?"pointer":"default", padding:"0 4px" }}>‹</button>
-            <div style={{ fontFamily:F.mono, fontSize:9, color:T.muted, letterSpacing:1 }}>
-              {slide+1} / {PARLAYS.length} · SWIPE TO SWITCH
-            </div>
-            <button onClick={() => setSlide(s => Math.min(2,s+1))}
-              style={{ background:"transparent", border:"none", color:slide<2?current.color:T.border,
-                fontSize:18, cursor:slide<2?"pointer":"default", padding:"0 4px" }}>›</button>
+        <div style={{ padding:"4px 14px 14px" }}>
+          <div style={{ fontFamily:F.mono, fontSize:8, color:T.muted, textAlign:"center", marginBottom:8 }}>
+            {slide+1} / {PARLAYS.length}
           </div>
           <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
             {current.players.map((p, i) => {
