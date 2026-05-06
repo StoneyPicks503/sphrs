@@ -1826,6 +1826,14 @@ export default function App() {
         ? "✅ Lineups — " + lineupConfirmed + "/" + games.length + " confirmed"
         : "⏳ Lineups not posted yet — batting order TBD");
 
+      // ── Live rosters — who is on which team TODAY ──
+      setStep("📋 Fetching live rosters...");
+      const liveRosterMap = await fetchRosterMap(games);
+      const rosterCount = Object.keys(liveRosterMap).length;
+      setStep(rosterCount > 0
+        ? "✅ Live rosters — " + rosterCount + " players mapped to teams"
+        : "⚠️ Roster fetch failed — using fallback team map");
+
       // ── Live HR stats from MLB Stats API (real 2026 data) ──
       setStep("📊 Fetching live HR stats from MLB...");
       const liveHRMap = await fetchLiveHRStats();
@@ -1918,7 +1926,11 @@ export default function App() {
             return true;
           })
           .map(p => {
-            const knownTeam = PLAYER_TEAMS[p.name] || PLAYER_TEAMS[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()];
+            // Live roster lookup first, PLAYER_TEAMS as fallback
+            const knownTeam = liveRosterMap[p.name]
+              ?? liveRosterMap[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()]
+              ?? PLAYER_TEAMS[p.name]
+              ?? PLAYER_TEAMS[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()];
             const team = knownTeam && validTeams.has(knownTeam) ? knownTeam : (p.team || teams.away);
             const isHome = team === teams.home;
             const pitcherName = isHome ? teams.away + " SP" : teams.home + " SP";
@@ -1996,7 +2008,11 @@ export default function App() {
         const w = weatherMap[key];
         // Build candidates from live data + fallback
         const liveForGame = Object.entries(liveHRMap)
-          .filter(([name]) => { const t = PLAYER_TEAMS[name]; return t === g.away || t === g.home; })
+          .filter(([name]) => {
+            const t = liveRosterMap[name] ?? liveRosterMap[name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()]
+                   ?? PLAYER_TEAMS[name];
+            return t === g.away || t === g.home;
+          })
           .map(([name, s]) => [name, s.hr, s.gp]);
         const fallbackForGame = Object.entries(KNOWN_2026_HR)
           .filter(([name]) => { const t = PLAYER_TEAMS[name]; return t === g.away || t === g.home; })
@@ -2205,3 +2221,59 @@ export default function App() {
     </div>
   );
 }
+/* ── Build live player→team map from MLB Stats API ──
+   Fetches all active rosters for teams in today's games
+   Returns { "Player Name": "TEAM_ABBR" } ── */
+async function fetchRosterMap(games) {
+  const playerTeamMap = {};
+  try {
+    // Get unique team abbreviations from today's games
+    const abbrs = [...new Set(games.flatMap(g => [g.away, g.home]))];
+
+    // MLB Stats API team ID lookup
+    const teamRes = await fetch(
+      "https://statsapi.mlb.com/api/v1/teams?sportId=1&season=2026&fields=teams,id,abbreviation"
+    );
+    if (!teamRes.ok) return playerTeamMap;
+    const teamData = await teamRes.json();
+    const abbrToId = {};
+    (teamData.teams || []).forEach(t => {
+      abbrToId[t.abbreviation] = t.id;
+      // Handle alternate abbreviations
+      if (t.abbreviation === "AZ") abbrToId["ARI"] = t.id;
+      if (t.abbreviation === "ARI") abbrToId["AZ"] = t.id;
+      if (t.abbreviation === "ATH") abbrToId["OAK"] = t.id;
+      if (t.abbreviation === "CWS") abbrToId["CHW"] = t.id;
+    });
+
+    // Fetch roster for each team in parallel
+    await Promise.all(abbrs.map(async abbr => {
+      const teamId = abbrToId[abbr];
+      if (!teamId) return;
+      try {
+        const r = await fetch(
+          "https://statsapi.mlb.com/api/v1/teams/" + teamId +
+          "/roster?rosterType=active&season=2026&fields=roster,person,fullName,id"
+        );
+        if (!r.ok) return;
+        const d = await r.json();
+        (d.roster || []).forEach(p => {
+          const name = p.person?.fullName;
+          if (name) {
+            playerTeamMap[name] = abbr;
+            // Also store without Jr/Sr suffix
+            const short = name.replace(/\s+(Jr|Sr)\.?$/i, "").trim();
+            if (short !== name) playerTeamMap[short] = abbr;
+          }
+        });
+      } catch (_) {}
+    }));
+
+    console.log("✅ Live rosters loaded —", Object.keys(playerTeamMap).length, "players mapped");
+  } catch (e) {
+    console.warn("Roster fetch failed:", e.message);
+  }
+  return playerTeamMap;
+}
+
+
