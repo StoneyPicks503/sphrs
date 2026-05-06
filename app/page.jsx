@@ -1026,35 +1026,24 @@ function getStatcastMult(avgEV, avgLA) {
 
 /* ── Real Monte Carlo HR Simulation ── */
 // Inputs: batter stats, pitcher stats, weather boost (-1 to +1), park factor, N trials
-function runHRSimulation(batter, pitcher, weatherBoost = 0, N = 1000, parkFactor = 1.0, pullFactor = 1.0) {
-  const gp  = batter?.gp || 33;
-  const hr  = batter?.hr || 3;
-  const name = batter?.name || "";
-  const pitcherHand = pitcher?.hand || "R";
+function runHRSimulation(batter, pitcher, weatherBoost = 0, N = 1000, parkFactor = 1.0) {
+  const gp = batter?.gp || 33;
+  const hr = batter?.hr || 3;
 
-  // ── Base rate: use HR split vs pitcher hand if available ──
-  const splitRate = getHRSplitRate(name, pitcherHand);
-  const baseRate = splitRate !== null
-    ? splitRate * 3.8 * 0.65           // split-based: PA rate → per-game, calibrated
-    : (hr / Math.max(gp, 20)) * 0.65;  // raised from 0.5 → more realistic display range
+  // 1. Batter HR rate — real 2026 stats, calibrated to single-game probability
+  const baseRate = (hr / Math.max(gp, 20)) * 0.65;
 
-  // ── Statcast: exit velocity + launch angle ──
-  // Softer power curve so elite EV is rewarded but not overwhelming
-  const statcastMult = getStatcastMult(batter?.avgEV, batter?.avgLA);
+  // 2. Pitcher ERA vs league avg 4.20 — real number from your game slate
+  const era = parseFloat(pitcher?.era || "4.20") || 4.20;
+  const pitcherMult = Math.max(0.72, Math.min(1.45, era / 4.20));
 
-  // ── Pitcher: HR/9 preferred over ERA ──
-  const hr9 = parseFloat(pitcher?.hr9 || "0");
-  const pitcherMult = hr9 > 0
-    ? Math.max(0.6, Math.min(1.6, hr9 / 1.25))
-    : Math.max(0.7, Math.min(1.45, (parseFloat(pitcher?.era || "4.20") || 4.20) / 4.20));
+  // 3. Park factor — verified multi-year data (Coors 1.38x, T-Mobile 0.85x)
+  const pf = Math.max(0.75, Math.min(1.45, parkFactor || 1.0));
 
-  // ── Park, pull, form, weather ──
-  const pf          = Math.max(0.75, Math.min(1.45, parkFactor || 1.0));
-  const pull        = Math.max(0.85, Math.min(1.25, pullFactor));
-  const formMult    = getFormMult(name, hr, gp);
+  // 4. Wind vs field — live Open-Meteo data (+1=blowing out, -1=blowing in)
   const weatherMult = 1 + (Math.max(-1, Math.min(1, weatherBoost)) * 0.10);
 
-  const hrProb = Math.min(0.38, baseRate * statcastMult * pitcherMult * pf * pull * formMult * weatherMult);
+  const hrProb = Math.min(0.38, baseRate * pitcherMult * pf * weatherMult);
 
   let hits = 0;
   for (let i = 0; i < N; i++) {
@@ -1753,7 +1742,7 @@ export default function App() {
               avgLA: p.avgLA || scLookup.avgLA || null,
             };
             const enrichedPitcher = { era: p.pitcherERA || 4.20, hr9: 0, hand: p.pitcherHand || "R" };
-            const simCount = runHRSimulation(enrichedBatter, enrichedPitcher, wBoost, 1000, parkFactor, pullFactor);
+            const simCount = runHRSimulation({ hr: knownHR||3, gp:33 }, { era: p.pitcherERA||4.20 }, wBoost, 1000, parkFactor);
             const weatherInsight = w && w.isOutdoor !== false
               ? w.tempF+"°F · "+w.windSpeed+"mph "+w.windDir+" ("+(w.windVsField||"?")+")"
               : w?.isOutdoor === false ? "Indoor dome" : "";
@@ -1795,8 +1784,7 @@ export default function App() {
             const pitcher = isHome ? g.awayP : g.homeP;
             const pitcherERA = isHome ? g.awayERA : g.homeERA;
             const pf2 = PARK_FACTORS[g.venue] || 1.0;
-            const pull2 = getPullFactor(g.venue, null, isHome ? g.awayH : g.homeH);
-            const simCount = runHRSimulation({hr,gp:33,ops:"0.750"},{era:pitcherERA||4.20},w?.fieldBoost??0,1000,pf2,pull2);
+            const simCount = runHRSimulation({hr,gp:33},{era:pitcherERA||4.20},w?.fieldBoost??0,1000,pf2);
             return { name, team, isHome, pitcher, pitcherHand: isHome?g.awayH:g.homeH, pitcherERA,
               seasonHRs:hr, gamesPlayed:33, simHRs:Math.min(Math.round(simCount),1000),
               hrChancePct:Math.min(20,hr*0.6), bvpSummary:"No BvP data",
