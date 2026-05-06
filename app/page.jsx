@@ -1140,6 +1140,112 @@ function buildPrompt(games, weatherMap = {}, gameData = {}) {
   ].join("\n");
 }
 
+
+/* ════════ TOP 3 PARLAY BANNER ════════ */
+function ParlayBanner({ results }) {
+  const [open, setOpen] = useState(true);
+
+  // Flatten all players across all games, sort by simHRs/hrChancePct
+  const allPlayers = [];
+  Object.entries(results).forEach(([key, gr]) => {
+    (gr.players || []).forEach(p => {
+      allPlayers.push({ ...p, gameKey: key });
+    });
+  });
+
+  const top3 = allPlayers
+    .sort((a, b) => {
+      const aScore = a.simHRs ?? (a.hrChancePct ?? 0) * 10;
+      const bScore = b.simHRs ?? (b.hrChancePct ?? 0) * 10;
+      return bScore - aScore;
+    })
+    .slice(0, 3);
+
+  if (top3.length < 2) return null;
+
+  // Combined parlay probability (multiply individual chances)
+  const combinedPct = top3.reduce((acc, p) => {
+    const pct = p.simHRs != null ? (p.simHRs / 1000) : ((p.hrChancePct ?? 10) / 100);
+    return acc * pct;
+  }, 1);
+  const combinedDisplay = (combinedPct * 100).toFixed(2);
+
+  return (
+    <div style={{
+      background: "linear-gradient(135deg, rgba(0,0,0,0.6), rgba(8,12,20,0.95))",
+      border: "1px solid " + T.gold + "66",
+      borderRadius: 14, marginBottom: 16, overflow: "hidden",
+      boxShadow: "0 0 30px rgba(255,215,0,0.15)",
+    }}>
+      {/* Header */}
+      <div
+        onClick={() => setOpen(v => !v)}
+        style={{
+          padding: "12px 16px", cursor: "pointer",
+          background: "linear-gradient(90deg, rgba(255,215,0,0.12), transparent)",
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+        }}
+      >
+        <div>
+          <div style={{ fontFamily: F.mono, fontSize: 9, letterSpacing: 3, color: T.gold, marginBottom: 2 }}>
+            ⚡ TODAY'S TOP PARLAY
+          </div>
+          <div style={{ fontFamily: F.arch, fontSize: 15, color: T.text }}>
+            Best 3 HR Picks Combined
+          </div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontFamily: F.bebas, fontSize: 28, color: T.gold, lineHeight: 1, textShadow: "0 0 20px rgba(255,215,0,0.6)" }}>
+            {combinedDisplay}%
+          </div>
+          <div style={{ fontFamily: F.mono, fontSize: 8, color: T.muted }}>PARLAY PROB</div>
+        </div>
+        <div style={{ color: T.gold, fontSize: 13, marginLeft: 12, transition: "transform .2s", transform: open ? "rotate(180deg)" : "rotate(0)" }}>▼</div>
+      </div>
+
+      {/* Players */}
+      {open && (
+        <div style={{ padding: "0 14px 14px" }}>
+          <div style={{ borderTop: "1px solid rgba(255,215,0,0.2)", paddingTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+            {top3.map((p, i) => {
+              const pct = p.simHRs != null
+                ? ((p.simHRs / 1000) * 100).toFixed(1)
+                : (p.hrChancePct ?? 0).toFixed(1);
+              const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉";
+              const c = parseFloat(pct) >= 20 ? "#00e676" : parseFloat(pct) >= 12 ? "#ffca28" : "#ffa726";
+              return (
+                <div key={i} style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  background: "rgba(255,215,0,0.05)", border: "1px solid rgba(255,215,0,0.15)",
+                  borderRadius: 9, padding: "8px 12px",
+                }}>
+                  <span style={{ fontSize: 18, flexShrink: 0 }}>{medal}</span>
+                  <Headshot mlbId={p.mlbId} name={p.name} size={36} teamColor={p.teamColor || T.gold} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: F.arch, fontSize: 13, color: T.text, marginBottom: 1 }}>
+                      {p.name}
+                    </div>
+                    <div style={{ fontFamily: F.mono, fontSize: 9, color: T.muted }}>
+                      {p.team} · {p.isHome ? "🏠 HOME" : "✈ AWAY"} · vs {p.pitcher || "TBD"}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ fontFamily: F.bebas, fontSize: 22, color: c, lineHeight: 1 }}>{pct}%</div>
+                    <div style={{ fontFamily: F.mono, fontSize: 8, color: T.muted }}>HR CHANCE</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ fontFamily: F.mono, fontSize: 9, color: T.muted, textAlign: "center", marginTop: 10, lineHeight: 1.6 }}>
+            Combined probability if all 3 hit a HR today · For entertainment purposes only
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ════════ MAIN APP ════════ */
 export default function App() {
   useAssets();
@@ -1889,6 +1995,11 @@ export default function App() {
               );
             })}
           </div>
+        )}
+
+        {/* Parlay banner — shows after analysis */}
+        {phase === "done" && Object.keys(results).length > 0 && (
+          <ParlayBanner results={results} />
         )}
 
         {/* Run button */}
