@@ -1246,17 +1246,27 @@ export default function App() {
     try {
       setStep("⚾ Loading " + games.length + " games...");
 
-      // Weather only external API — Open-Meteo has no rate limit
+      // ── Weather (Open-Meteo — no rate limit) ──
       setStep("🌤 Fetching weather...");
       const weatherMap = await fetchWeatherForGames(games);
-      setStep("✅ Weather ready");
+      const weatherHits = Object.values(weatherMap).filter(w => w !== null).length;
+      setStep("✅ Weather loaded — " + weatherHits + "/" + games.length + " stadiums");
 
-      // All other data from hardcoded maps — zero extra API calls
-      const liveHRMap = {};
-      const pitcherIdMap = PITCHER_IDS;
-      const injuredPlayers = new Set();
+      // ── Live 2026 HR stats ──
+      setStep("📊 Fetching HR stats...");
+      const liveHRMap = await fetchLiveHRStats();
+      setStep("✅ HR stats — " + Object.keys(liveHRMap).length + " players");
+
+      // ── Pitcher IDs (hardcoded first, API fallback for unknowns) ──
+      const allPitcherNames = [...new Set(games.flatMap(g => [g.awayP, g.homeP]).filter(Boolean))];
+      const pitcherIdMap = await fetchPitcherIds(allPitcherNames);
+      setStep("✅ " + Object.keys(pitcherIdMap).length + " pitcher IDs");
+
+      // ── Injury report ──
+      setStep("🏥 Checking injury list...");
+      const injuredPlayers = await fetchInjuredPlayers();
+
       const bvpCache = {};
-
       setStep("🎲 Starting analysis...");
       await new Promise(r => setTimeout(r, 200));
 
@@ -1285,7 +1295,8 @@ export default function App() {
       })));
 
       for (let b = 0; b < batches.length; b++) {
-        const batchGameData = {};
+        const batchGameData = await prefetchGameData(batches[b]);
+        Object.assign(allGameData, batchGameData);
 
         if (b > 0) await new Promise(r => setTimeout(r, 2000)); // 2s pause between batches
         const raw = await callClaude(buildPrompt(batches[b], weatherMap, batchGameData), 2000);
@@ -1367,171 +1378,9 @@ export default function App() {
         setStep("✅ Batch " + (b + 1) + " done — " + batchResults.length + " games analyzed");
       }
 
-      // ── VERIFICATION PASS ─────────────────────────────────────────────────
-      setStep("🔍 Verifying positions & rosters...");
-
-      // Collect ALL players across all games
-      const allPlayers = [];
-      allGameResults.forEach(gr => {
-        (gr.players ?? []).forEach(p => {
-          allPlayers.push({ name: p.name, team: p.team, gameKey: gr.away + gr.home });
-        });
-      });
-
-      // Deduplicate by name BEFORE verification to save tokens
-      const uniqueNames = new Set();
-      const uniqueForVerify = allPlayers.filter(p => {
-        if (uniqueNames.has(p.name)) return false;
-        uniqueNames.add(p.name);
-        return true;
-      });
-
-      const vList = uniqueForVerify.map((p, i) =>
-        (i + 1) + ". " + p.name + " | team: " + p.team
-      ).join("\n");
-
-      const verifyPrompt = [
-        "You are an MLB expert. Today is May 4 2026.",
-        "Verify each player. Check ALL of these:",
-        "1. POSITION PLAYER ONLY — flag any pitcher (SP/RP). Pitchers CANNOT be HR candidates.",
-        "2. NOT INJURED — flag anyone currently on the MLB Injured List (10-day or 60-day IL) as of May 4 2026.",
-        "3. CORRECT TEAM — flag if on wrong team. Key 2026 moves:",
-        "   Pete Alonso=BAL, Juan Soto=NYM, Max Fried=NYY, Paul Goldschmidt=NYY,",
-        "   Cody Bellinger=NYY, Rafael Devers=SF, Willy Adames=SF, Alex Bregman=BOS,",
-        "   Randy Arozarena=SEA, Shohei Ohtani=LAD, Munetaka Murakami=CWS.",
-        "3. ACTIVE ROSTER — flag if on IL or in minors.",
-        "",
-        "Players:",
-        vList,
-        "",
-        "Return ONLY a JSON array. Start with [ end with ]. No other text.",
-        '[{"i":0,"name":"Aaron Judge","ok":true,"reason":""},',
-        '{"i":1,"name":"Max Fried","ok":false,"reason":"Pitcher — not a batter"}]',
-      ].join("\n");
-
-      let verifyChecks = [];
-      try {
-        const vRaw = await callClaude(verifyPrompt, 3000);
-        const vParsed = grabJSON(vRaw);
-        verifyChecks = Array.isArray(vParsed) ? vParsed : [];
-
-        const flagged = verifyChecks.filter(c => c.ok === false);
-
-        if (flagged.length > 0) {
-          flagged.forEach(f => setStep("⚠️ Removed " + f.name + " — " + (f.reason || "failed check")));
-        }
-        if (flagged.length === 0) {
-          setStep("✅ All players verified — position players on correct 2026 rosters");
-        }
-      } catch (_) {
-        setStep("⚠️ Verification inconclusive — using original picks");
-        verifyChecks = uniqueForVerify.map((_, i) => ({ i, ok: true }));
-      }
-
-      // Known 2026 HR totals — used to correct wrong values from Claude
-      // VERIFIED 2026 HR totals as of May 3 2026 — source: SI.com/MLB.com
-      const KNOWN_2026_HR = {
-        // Top confirmed leaders
-        "Aaron Judge":13,"Munetaka Murakami":13,"Yordan Alvarez":12,"Ben Rice":12,
-        "Matt Olson":11,"Mike Trout":9,"Kyle Schwarber":9,"Gunnar Henderson":9,
-        "Pete Alonso":8,"Bryce Harper":8,"Juan Soto":8,"Jordan Walker":8,
-        "Bobby Witt Jr":7,"Vladimir Guerrero Jr":7,"Jose Ramirez":7,
-        "Mookie Betts":7,"Freddie Freeman":7,"Fernando Tatis Jr":7,
-        "Shohei Ohtani":7,"Rafael Devers":7,"Matt Chapman":6,
-        "Elly De La Cruz":6,"Julio Rodriguez":6,"Randy Arozarena":6,
-        "Ian Happ":6,"Jarren Duran":6,"Jackson Chourio":5,
-        "Pete Crow-Armstrong":5,"Alex Bregman":5,"Willy Adames":5,
-        "Byron Buxton":5,"Nolan Arenado":5,"Francisco Lindor":5,
-        "Shea Langeliers":5,"Nick Kurtz":4,"James Wood":4,
-        "Vinnie Pasquantino":4,"Salvador Perez":4,"Ketel Marte":4,
-        "Bo Bichette":4,"Riley Greene":4,"Spencer Torkelson":4,
-        "William Contreras":4,"Corbin Carroll":3,"Austin Riley":5,
-        "Ozzie Albies":4,"Tyler Stephenson":3,"Jonathan India":3,
-        "Jorge Soler":4,"Manny Machado":5,"Jake Cronenworth":3,
-      };
-
-      // Known 2026 player→team — used to catch wrong-team assignments
-      const PLAYER_TEAMS = {
-        // NYM
-        "Juan Soto":"NYM","Francisco Lindor":"NYM","Mark Vientos":"NYM","Brandon Nimmo":"NYM","Jeff McNeil":"NYM",
-        // COL
-        "Ezequiel Tovar":"COL","Brenton Doyle":"COL","Ryan McMahon":"COL","Charlie Blackmon":"COL","Michael Lorenzen":"COL",
-        // PHI
-        "Bryce Harper":"PHI","Kyle Schwarber":"PHI","Trea Turner":"PHI","Nick Castellanos":"PHI","J.T. Realmuto":"PHI","JT Realmuto":"PHI","Cristopher Sanchez":"PHI",
-        // MIA
-        "Jorge Soler":"MIA","Luis Arraez":"MIA","Jake Burger":"MIA","Connor Norby":"MIA","Sandy Alcantara":"MIA",
-        // TOR
-        "Vladimir Guerrero Jr":"TOR","Bo Bichette":"TOR","George Springer":"TOR","Daulton Varsho":"TOR","Kevin Gausman":"TOR",
-        // TB
-        "Junior Caminero":"TB","Josh Lowe":"TB","Yandy Diaz":"TB","Christopher Morel":"TB","Drew Rasmussen":"TB",
-        // BOS
-        "Alex Bregman":"BOS","Jarren Duran":"BOS","Triston Casas":"BOS","Masataka Yoshida":"BOS","Rob Refsnyder":"BOS","Wilyer Abreu":"BOS",
-        // DET
-        "Spencer Torkelson":"DET","Riley Greene":"DET","Kerry Carpenter":"DET","Zach McKinstry":"DET","Matt Vierling":"DET","Framber Valdez":"DET",
-        // CIN
-        "Elly De La Cruz":"CIN","Tyler Stephenson":"CIN","Jonathan India":"CIN","TJ Friedl":"CIN","Andrew Abbott":"CIN",
-        // CHC
-        "Ian Happ":"CHC","Pete Crow-Armstrong":"CHC","Seiya Suzuki":"CHC","Michael Busch":"CHC","Dansby Swanson":"CHC","Jameson Taillon":"CHC",
-        // BAL
-        "Gunnar Henderson":"BAL","Pete Alonso":"BAL","Cedric Mullins":"BAL","Adley Rutschman":"BAL","Anthony Santander":"BAL","Colton Cowser":"BAL","Chris Bassitt":"BAL",
-        // NYY
-        "Aaron Judge":"NYY","Ben Rice":"NYY","Paul Goldschmidt":"NYY","Cody Bellinger":"NYY","Jazz Chisholm":"NYY","Anthony Volpe":"NYY","Gleyber Torres":"NYY","Austin Wells":"NYY","Elmer Rodriguez":"NYY",
-        // CLE
-        "Jose Ramirez":"CLE","Steven Kwan":"CLE","Josh Naylor":"CLE","Lane Thomas":"CLE","David Fry":"CLE","Gavin Williams":"CLE",
-        // KC
-        "Bobby Witt Jr":"KC","Vinnie Pasquantino":"KC","Salvador Perez":"KC","MJ Melendez":"KC","Hunter Renfroe":"KC","Stephen Kolek":"KC",
-        // MIL
-        "Jackson Chourio":"MIL","William Contreras":"MIL","Christian Yelich":"MIL","Joey Wiemer":"MIL","Rhys Hoskins":"MIL","Brandon Sproat":"MIL",
-        // STL
-        "Nolan Arenado":"STL","Jordan Walker":"STL","Lars Nootbaar":"STL","Brendan Donovan":"STL","Paul DeJong":"STL","Andre Pallante":"STL",
-        // LAD
-        "Shohei Ohtani":"LAD","Mookie Betts":"LAD","Freddie Freeman":"LAD","Will Smith":"LAD","Teoscar Hernandez":"LAD","Max Muncy":"LAD","Gavin Lux":"LAD",
-        // HOU
-        "Yordan Alvarez":"HOU","Jose Altuve":"HOU","Kyle Tucker":"HOU","Yainer Diaz":"HOU","Chas McCormick":"HOU","Jeremy Pena":"HOU",
-        // CWS
-        "Munetaka Murakami":"CWS","Andrew Vaughn":"CWS","Eloy Jimenez":"CWS","Korey Lee":"CWS",
-        // LAA
-        "Mike Trout":"LAA","Taylor Ward":"LAA","Zach Neto":"LAA","Logan O'Hoppe":"LAA","Kevin Pillar":"LAA",
-        // ATL
-        "Matt Olson":"ATL","Austin Riley":"ATL","Ozzie Albies":"ATL","Sean Murphy":"ATL","Michael Harris II":"ATL","Ronald Acuna Jr":"ATL",
-        // SEA
-        "Julio Rodriguez":"SEA","Randy Arozarena":"SEA","Cal Raleigh":"SEA","Luke Raley":"SEA","Mitch Garver":"SEA",
-        // SD
-        "Fernando Tatis Jr":"SD","Manny Machado":"SD","Jake Cronenworth":"SD","Ha-Seong Kim":"SD","Jackson Merrill":"SD",
-        // SF
-        "Rafael Devers":"SF","Willy Adames":"SF","Matt Chapman":"SF","Heliot Ramos":"SF","Mike Yastrzemski":"SF","Patrick Bailey":"SF","Logan Webb":"SF","Walker Buehler":"SF",
-        // ATH
-        "Nick Kurtz":"ATH","Shea Langeliers":"ATH","Brent Rooker":"ATH","JJ Bleday":"ATH","Luis Severino":"ATH",
-        // WSH
-        "James Wood":"WSH","CJ Abrams":"WSH","Keibert Ruiz":"WSH","Jesse Winker":"WSH","Cade Cavalli":"WSH",
-        // MIN
-        "Byron Buxton":"MIN","Carlos Correa":"MIN","Ryan Jeffers":"MIN","Matt Wallner":"MIN","Edouard Julien":"MIN","Taj Bradley":"MIN",
-        // TEX
-        "Nathaniel Lowe":"TEX","Adolis Garcia":"TEX","Jonah Heim":"TEX","Wyatt Langford":"TEX","Jacob deGrom":"TEX","Marcus Semien":"TEX",
-        // PIT
-        "Oneil Cruz":"PIT","Bryan Reynolds":"PIT","Nick Gonzales":"PIT","Rowdy Tellez":"PIT","Bubba Chandler":"PIT","Andrew McCutchen":"PIT",
-        // AZ
-        "Ketel Marte":"AZ","Corbin Carroll":"AZ","Christian Walker":"AZ","Lourdes Gurriel Jr":"AZ","Eduardo Rodriguez":"AZ","Josh Bell":"AZ",
-        // SD
-        "Fernando Tatis Jr":"SD","Manny Machado":"SD","Jake Cronenworth":"SD","Ha-Seong Kim":"SD","Jackson Merrill":"SD","Walker Buehler":"SD",
-        // HOU
-        "Yordan Alvarez":"HOU","Jose Altuve":"HOU","Yainer Diaz":"HOU","Chas McCormick":"HOU","Jeremy Pena":"HOU","Peter Lambert":"HOU",
-        // LAD
-        "Shohei Ohtani":"LAD","Mookie Betts":"LAD","Freddie Freeman":"LAD","Will Smith":"LAD","Teoscar Hernandez":"LAD","Max Muncy":"LAD",
-        // LAA
-        "Mike Trout":"LAA","Taylor Ward":"LAA","Zach Neto":"LAA","Logan O'Hoppe":"LAA","Sam Aldegheri":"LAA",
-        // CWS
-        "Munetaka Murakami":"CWS","Andrew Vaughn":"CWS","Korey Lee":"CWS","Erick Fedde":"CWS",
-        // SEA
-        "Julio Rodriguez":"SEA","Randy Arozarena":"SEA","Cal Raleigh":"SEA","Luke Raley":"SEA","George Kirby":"SEA",
-        // ATL
-        "Matt Olson":"ATL","Austin Riley":"ATL","Ozzie Albies":"ATL","Sean Murphy":"ATL","Michael Harris II":"ATL","Bryce Elder":"ATL",
-      };
-
-      // Build lookup maps from verification results
-      const flaggedNames = new Set(
-        verifyChecks.filter(c => c.ok === false).map(c => c.name)
-      );
+      // Verification skipped — filters handle bad picks client-side
+      const flaggedNames = new Set();
+      const hotStreakMap = {};
 
       // Build a lookup: gameKey → { away, home } so we can validate team membership
       const gameTeamMap = {};
@@ -1672,7 +1521,29 @@ export default function App() {
         newResults[key] = { players: cleanPlayers };
       });
 
-      setResults({...newResults}); // trigger re-render with BvP data
+      // ── BvP enrichment (sequential) ──
+      setStep("⚔️ Fetching BvP data...");
+      const bvpFetches = [];
+      Object.values(newResults).forEach(gr => {
+        (gr.players ?? []).forEach(p => {
+          const batterId = BATTER_IDS[p.name] ?? BATTER_IDS[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()] ?? p.mlbId;
+          const pitcherId = pitcherIdMap[p.pitcher] ?? PITCHER_IDS[p.pitcher];
+          if (batterId && pitcherId) {
+            bvpFetches.push(Promise.all([
+              fetchBvP(batterId, pitcherId),
+              fetchPitcherArsenal(pitcherId)
+            ]).then(([bvp, arsenal]) => {
+              if (bvp) { p.bvpHR=bvp.hr; p.bvpAB=bvp.ab; p.bvpAVG=bvp.avg;
+                p.bvpSummary=bvp.ab+" AB · "+bvp.avg+" AVG · "+bvp.hr+" HR"; }
+              if (arsenal?.length > 0) p.pitcherArsenal = arsenal;
+            }));
+          }
+        });
+      });
+      for (const f of bvpFetches) { await f; await new Promise(r => setTimeout(r, 100)); }
+      setStep("✅ BvP loaded — " + bvpFetches.length + " matchups");
+
+      setResults({...newResults});
       setOpenGames(new Set(games.map(g => g.away + g.home)));
       setStep("✅ All " + allGameResults.length + " games analyzed! Click any game to see HR %.");
       setPhase("done");
