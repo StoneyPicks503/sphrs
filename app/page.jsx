@@ -127,6 +127,73 @@ async function callClaude(text, maxTokens = 8192) {
 }
 
 
+/* ── Pull-side HR field geometry ──
+   RHB pulls to LF, LHB pulls to RF
+   Shorter pull-side fence = more HRs for that handedness
+   League avg foul line: ~330ft
+   Factor = 330 / actual_distance (shorter = higher factor)
+── */
+const PULL_FACTORS = {
+  // venue: { LHB_RF: factor, RHB_LF: factor }
+  // LHB benefits from short RF, RHB benefits from short LF
+  "Yankee Stadium":      { LHB: 1.18, RHB: 1.08 }, // RF 314ft short porch (LHB huge), LF 318ft
+  "Fenway Park":         { LHB: 1.00, RHB: 1.24 }, // LF 310ft Green Monster (RHB), RF 302ft Pesky Pole (LHB)
+  "Oracle Park":         { LHB: 1.00, RHB: 0.85 }, // LF 339ft, RF 309ft but McCovey Cove kills HRs
+  "Wrigley Field":       { LHB: 1.02, RHB: 1.02 }, // Fairly symmetric 353/353
+  "Coors Field":         { LHB: 1.05, RHB: 1.05 }, // Symmetric but altitude helps all
+  "Petco Park":          { LHB: 1.00, RHB: 0.95 }, // Deep LCF hurts RHB
+  "Angel Stadium":       { LHB: 1.02, RHB: 1.02 }, // Symmetric 347/347
+  "Kauffman Stadium":    { LHB: 1.02, RHB: 1.02 }, // Symmetric 330/330
+  "Busch Stadium":       { LHB: 1.02, RHB: 1.02 }, // Symmetric 336/335
+  "Comerica Park":       { LHB: 0.95, RHB: 1.00 }, // Deep CF/LCF hurts
+  "Citizens Bank Park":  { LHB: 1.04, RHB: 1.03 }, // Hitter-friendly 330/329
+  "Nationals Park":      { LHB: 1.02, RHB: 1.02 }, // Symmetric
+  "Great American":      { LHB: 1.05, RHB: 1.04 }, // Hitter-friendly 328/325
+  "Target Field":        { LHB: 1.02, RHB: 1.03 }, // Slight RHB advantage
+  "PNC Park":            { LHB: 1.06, RHB: 0.97 }, // RF 320ft short (LHB), deep LF
+  "Truist Park":         { LHB: 1.04, RHB: 1.02 }, // RF 325ft
+  "Guaranteed Rate":     { LHB: 1.02, RHB: 1.02 },
+  "Sutter Health Park":  { LHB: 1.02, RHB: 1.02 },
+  "Chase Field":         { LHB: 1.02, RHB: 1.02 },
+  "Daikin Park":         { LHB: 1.02, RHB: 1.02 },
+  "loanDepot Park":      { LHB: 1.02, RHB: 1.02 },
+  "Tropicana Field":     { LHB: 1.02, RHB: 1.02 },
+  "T-Mobile Park":       { LHB: 0.95, RHB: 0.95 },
+};
+
+/* Pitcher handedness advantage:
+   Same-handed pitchers (RHP vs RHB, LHP vs LHB) = batter hits AWAY side = less pull = fewer HRs
+   Opposite-handed (RHP vs LHB, LHP vs RHB) = batter pulls more = more HRs
+   This is the platoon effect on pull-side contact */
+function getPullFactor(venue, batterHand, pitcherHand) {
+  const pf = PULL_FACTORS[venue] || { LHB: 1.0, RHB: 1.0 };
+  const fieldFactor = batterHand === "L" ? pf.LHB : pf.RHB;
+  // Opposite-handed matchup = more pull contact = 1.06x boost
+  // Same-handed matchup = away contact = 0.95x reduction
+  const platoonFactor = (batterHand && pitcherHand && batterHand !== pitcherHand) ? 1.06 : 0.97;
+  return fieldFactor * platoonFactor;
+}
+
+
+/* Known batter handedness for pull-side calculation */
+const BATTER_HANDS = {
+  "Aaron Judge":"R","Shohei Ohtani":"L","Mookie Betts":"R","Yordan Alvarez":"L",
+  "Matt Olson":"L","Kyle Schwarber":"L","Bryce Harper":"L","Gunnar Henderson":"L",
+  "Pete Alonso":"R","Juan Soto":"L","Vladimir Guerrero Jr":"R","Bo Bichette":"R",
+  "Jose Ramirez":"S","Elly De La Cruz":"S","Bobby Witt Jr":"R","Mike Trout":"L",
+  "Nolan Arenado":"R","Freddie Freeman":"L","Rafael Devers":"L","Fernando Tatis Jr":"R",
+  "Francisco Lindor":"S","James Wood":"L","Byron Buxton":"R","Randy Arozarena":"R",
+  "Ian Happ":"S","Pete Crow-Armstrong":"L","Julio Rodriguez":"R","Shea Langeliers":"R",
+  "Willy Adames":"R","Matt Chapman":"R","Jarren Duran":"L","Alex Bregman":"R",
+  "Jackson Chourio":"L","Munetaka Murakami":"R","Nick Kurtz":"L","Ben Rice":"L",
+  "Jazz Chisholm":"L","Austin Riley":"R","Ozzie Albies":"S","Spencer Torkelson":"R",
+  "Riley Greene":"L","Kerry Carpenter":"L","Triston Casas":"L","Jordan Walker":"R",
+  "Ketel Marte":"S","Corbin Carroll":"L","Manny Machado":"R","Oneil Cruz":"S",
+  "Bryan Reynolds":"S","Carlos Correa":"R","Cal Raleigh":"L","Nathaniel Lowe":"L",
+  "Christian Walker":"R","Salvador Perez":"R","Vinnie Pasquantino":"L","Adolis Garcia":"R",
+};
+
+
 /* ── Stadium data: coordinates + home plate bearing ── */
 // cfBearing = compass direction home plate faces toward CF (outfield direction)
 // Wind FROM opposite of cfBearing = blowing OUT = HR boost
@@ -697,7 +764,7 @@ async function fetchInjuredPlayers() {
 
 /* ── Real Monte Carlo HR Simulation ── */
 // Inputs: batter stats, pitcher stats, weather boost (-1 to +1), park factor, N trials
-function runHRSimulation(batter, pitcher, weatherBoost = 0, N = 1000, parkFactor = 1.0) {
+function runHRSimulation(batter, pitcher, weatherBoost = 0, N = 1000, parkFactor = 1.0, pullFactor = 1.0) {
   const gp  = batter?.gp || 33;
   const hr  = batter?.hr || 3;
   const ops = parseFloat(batter?.ops || "0.720") || 0.720;
@@ -733,7 +800,9 @@ function runHRSimulation(batter, pitcher, weatherBoost = 0, N = 1000, parkFactor
   const weatherMult = 1 + (Math.max(-1, Math.min(1, weatherBoost)) * 0.10);
 
   // ── Final probability ──
-  const hrProb = Math.min(0.32, (baseRate + opsBoost) * pitcherMult * pf * weatherMult);
+  // Pull factor: batter handedness × pitcher handedness × field dimensions
+  const pull = Math.max(0.85, Math.min(1.25, pullFactor));
+  const hrProb = Math.min(0.32, (baseRate + opsBoost) * pitcherMult * pf * pull * weatherMult);
 
   let hits = 0;
   for (let i = 0; i < N; i++) {
@@ -1419,12 +1488,14 @@ export default function App() {
             const simBat = { hr: knownHR||3, gp:33, ops:"0.750" };
             const pitcherForSim = { era: pitcherERA || 4.20 };
             const parkFactor = PARK_FACTORS[gameObj?.venue] || 1.0;
-            const simCount = runHRSimulation(simBat, pitcherForSim, wBoost, 1000, parkFactor);
+            const pullFactor = getPullFactor(gameObj?.venue, p.batterHand, p.pitcherHand);
+            const simCount = runHRSimulation(simBat, pitcherForSim, wBoost, 1000, parkFactor, pullFactor);
             const weatherInsight = w && w.isOutdoor !== false
               ? w.tempF+"°F · "+w.windSpeed+"mph "+w.windDir+" ("+(w.windVsField||"?")+")"
               : w?.isOutdoor === false ? "Indoor dome" : "";
+            const batterHand = BATTER_HANDS[p.name] || BATTER_HANDS[p.name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()] || "R";
             return {
-              ...p, team, isHome, pitcher, pitcherHand, pitcherERA,
+              ...p, team, isHome, pitcher, pitcherHand, pitcherERA, batterHand,
               pitcherWhip: null,
               seasonHRs:   knownHR ?? p.seasonHRs ?? null,
               gamesPlayed: 33,
@@ -1457,7 +1528,8 @@ export default function App() {
             const pitcher = isHome ? g.awayP : g.homeP;
             const pitcherERA = isHome ? g.awayERA : g.homeERA;
             const pf2 = PARK_FACTORS[g.venue] || 1.0;
-            const simCount = runHRSimulation({hr,gp:33,ops:"0.750"},{era:pitcherERA||4.20},w?.fieldBoost??0,1000,pf2);
+            const pull2 = getPullFactor(g.venue, null, isHome ? g.awayH : g.homeH);
+            const simCount = runHRSimulation({hr,gp:33,ops:"0.750"},{era:pitcherERA||4.20},w?.fieldBoost??0,1000,pf2,pull2);
             return { name, team, isHome, pitcher, pitcherHand: isHome?g.awayH:g.homeH, pitcherERA,
               seasonHRs:hr, gamesPlayed:33, simHRs:Math.min(Math.round(simCount),1000),
               hrChancePct:Math.min(20,hr*0.6), bvpSummary:"No BvP data",
