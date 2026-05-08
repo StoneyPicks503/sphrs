@@ -45,51 +45,51 @@ function useAssets() {
 
 /* ── All 15 games ── */
 const ALL_GAMES = [
-  { away:"TOR", home:"TB",  venue:"Tropicana Field",    city:"St. Petersburg", st:"FL", time:"1:10 PM ET",
-    awayP:"Patrick Corbin",      awayH:"LHP", awayERA:3.65, awayRec:"1-0",
-    homeP:"Shane McClanahan",    homeH:"LHP", homeERA:3.10, homeRec:"3-2" },
-  { away:"MIL", home:"STL", venue:"Busch Stadium",      city:"St. Louis",      st:"MO", time:"1:15 PM ET",
-    awayP:"Brandon Sproat",      awayH:"RHP", awayERA:6.75, awayRec:"0-2",
-    homeP:"Andre Pallante",      homeH:"RHP", homeERA:3.73, homeRec:"3-2" },
-  { away:"LAD", home:"HOU", venue:"Daikin Park",        city:"Houston",        st:"TX", time:"2:10 PM ET",
-    awayP:"Tyler Glasnow",       awayH:"RHP", awayERA:2.56, awayRec:"3-0",
-    homeP:"Lance McCullers Jr.", homeH:"RHP", homeERA:6.32, homeRec:"2-2" },
-  { away:"SD",  home:"SF",  venue:"Oracle Park",        city:"San Francisco",  st:"CA", time:"3:45 PM ET",
-    awayP:"Matt Waldron",        awayH:"RHP", awayERA:9.88, awayRec:"0-1",
-    homeP:"Adrian Houser",       homeH:"RHP", homeERA:7.12, homeRec:"0-3" },
-  { away:"CWS", home:"LAA", venue:"Angel Stadium",      city:"Anaheim",        st:"CA", time:"4:07 PM ET",
-    awayP:"Noah Schultz",        awayH:"LHP", awayERA:2.53, awayRec:"2-1",
-    homeP:"Walbert Urena",       homeH:"RHP", homeERA:3.86, homeRec:"0-3" },
-  { away:"ATL", home:"SEA", venue:"T-Mobile Park",      city:"Seattle",        st:"WA", time:"4:10 PM ET",
-    awayP:"Grant Holmes",        awayH:"RHP", awayERA:4.34, awayRec:"2-1",
-    homeP:"Bryan Woo",           homeH:"RHP", homeERA:4.61, homeRec:"1-2" },
-  { away:"ATH", home:"PHI", venue:"Citizens Bank Park", city:"Philadelphia",   st:"PA", time:"6:40 PM ET",
-    awayP:"Jeffrey Springs",     awayH:"LHP", awayERA:3.96, awayRec:"3-2",
-    homeP:"Zack Wheeler",        homeH:"RHP", homeERA:2.45, homeRec:"1-0" },
-  { away:"BAL", home:"MIA", venue:"loanDepot Park",     city:"Miami",          st:"FL", time:"6:40 PM ET",
-    awayP:"Brandon Young",       awayH:"RHP", awayERA:6.14, awayRec:"2-1",
-    homeP:"Eury Perez",          homeH:"RHP", homeERA:4.46, homeRec:"2-3" },
-  { away:"BOS", home:"DET", venue:"Comerica Park",      city:"Detroit",        st:"MI", time:"6:40 PM ET",
-    awayP:"Sonny Gray",          awayH:"RHP", awayERA:4.30, awayRec:"2-1",
-    homeP:"Jack Flaherty",       homeH:"RHP", homeERA:5.90, homeRec:"0-2" },
-  { away:"MIN", home:"WSH", venue:"Nationals Park",     city:"Washington",     st:"DC", time:"6:45 PM ET",
-    awayP:"Bailey Ober",         awayH:"RHP", awayERA:3.55, awayRec:"3-1",
-    homeP:"Miles Mikolas",       homeH:"RHP", homeERA:8.23, homeRec:"0-3" },
-  { away:"TEX", home:"NYY", venue:"Yankee Stadium",     city:"New York",       st:"NY", time:"7:05 PM ET",
-    awayP:"Nathan Eovaldi",      awayH:"RHP", awayERA:4.76, awayRec:"3-4",
-    homeP:"Will Warren",         homeH:"RHP", homeERA:2.39, homeRec:"4-0" },
-  { away:"CIN", home:"CHC", venue:"Wrigley Field",      city:"Chicago",        st:"IL", time:"7:40 PM ET",
-    awayP:"Brady Singer",        awayH:"RHP", awayERA:5.57, awayRec:"2-2",
-    homeP:"Colin Rea",           homeH:"RHP", homeERA:4.41, homeRec:"4-1" },
-  { away:"CLE", home:"KC",  venue:"Kauffman Stadium",   city:"Kansas City",    st:"MO", time:"7:40 PM ET",
-    awayP:"Joey Cantillo",       awayH:"LHP", awayERA:3.67, awayRec:"1-1",
-    homeP:"Cole Ragans",         homeH:"LHP", homeERA:5.29, homeRec:"1-4" },
-  { away:"NYM", home:"COL", venue:"Coors Field",        city:"Denver",         st:"CO", time:"9:20 PM ET",
-    awayP:"Freddy Peralta",      awayH:"RHP", awayERA:3.52, awayRec:"1-3",
-    homeP:"Michael Lorenzen",    homeH:"RHP", homeERA:6.09, homeRec:"2-3" },
-  { away:"PIT", home:"ARI", venue:"Chase Field",        city:"Phoenix",        st:"AZ", time:"9:40 PM ET",
-    awayP:"Paul Skenes",         awayH:"RHP", awayERA:3.18, awayRec:"4-2",
-    homeP:"Michael Soroka",      homeH:"RHP", homeERA:4.70, homeRec:"4-1" },
+  { away:"HOU", home:"CIN", venue:"Great American Ball Park",          city:"Cincinnati",    st:"OH", time:"6:10 PM ET",
+    awayP:"Mike Burrows",        awayH:"RHP", awayERA:5.97, awayRec:"1-4",
+    homeP:"Nick Lodolo",         homeH:"LHP", homeERA:null, homeRec:"0-0" },
+  { away:"COL", home:"PHI", venue:"Citizens Bank Park",                city:"Philadelphia",  st:"PA", time:"6:40 PM ET",
+    awayP:"Chase Dollander",     awayH:"RHP", awayERA:3.38, awayRec:"3-2",
+    homeP:"Jesus Luzardo",       homeH:"LHP", homeERA:5.09, homeRec:"3-3" },
+  { away:"ATH", home:"BAL", venue:"Oriole Park at Camden Yards",       city:"Baltimore",     st:"MD", time:"7:05 PM ET",
+    awayP:"Jacob Lopez",         awayH:"LHP", awayERA:6.60, awayRec:"2-2",
+    homeP:"Kyle Bradish",        homeH:"RHP", homeERA:5.03, homeRec:"1-4" },
+  { away:"LAA", home:"TOR", venue:"Rogers Centre",                     city:"Toronto",       st:"ON", time:"7:07 PM ET",
+    awayP:"Reid Detmers",        awayH:"LHP", awayERA:4.28, awayRec:"1-2",
+    homeP:"Dylan Cease",         homeH:"RHP", homeERA:3.05, homeRec:"2-1" },
+  { away:"WSH", home:"MIA", venue:"loanDepot Park",                    city:"Miami",         st:"FL", time:"7:10 PM ET",
+    awayP:"Foster Griffin",      awayH:"LHP", awayERA:2.27, awayRec:"3-1",
+    homeP:"Robby Snelling",      homeH:"LHP", homeERA:null, homeRec:"0-0" },
+  { away:"TB",  home:"BOS", venue:"Fenway Park",                       city:"Boston",        st:"MA", time:"7:10 PM ET",
+    awayP:"Jesse Scholtens",     awayH:"RHP", awayERA:3.18, awayRec:"3-1",
+    homeP:"Connelly Early",      homeH:"LHP", homeERA:3.79, homeRec:"2-2" },
+  { away:"MIN", home:"CLE", venue:"Progressive Field",                 city:"Cleveland",     st:"OH", time:"7:15 PM ET",
+    awayP:"Connor Prielipp",     awayH:"LHP", awayERA:3.86, awayRec:"1-0",
+    homeP:"Parker Messick",      homeH:"LHP", homeERA:2.40, homeRec:"3-1" },
+  { away:"SEA", home:"CWS", venue:"Rate Field",                        city:"Chicago",       st:"IL", time:"7:40 PM ET",
+    awayP:"Emerson Hancock",     awayH:"RHP", awayERA:2.59, awayRec:"2-1",
+    homeP:"Sean Burke",          homeH:"RHP", homeERA:2.72, homeRec:"2-2" },
+  { away:"NYY", home:"MIL", venue:"American Family Field",             city:"Milwaukee",     st:"WI", time:"7:40 PM ET",
+    awayP:"Max Fried",           awayH:"LHP", awayERA:2.39, awayRec:"4-1",
+    homeP:"Jacob Misiorowski",   homeH:"RHP", homeERA:2.84, homeRec:"2-2" },
+  { away:"DET", home:"KC",  venue:"Kauffman Stadium",                  city:"Kansas City",   st:"MO", time:"7:40 PM ET",
+    awayP:"Keider Montero",      awayH:"RHP", awayERA:3.48, awayRec:"2-2",
+    homeP:"Kris Bubic",          homeH:"LHP", homeERA:3.32, homeRec:"3-1" },
+  { away:"CHC", home:"TEX", venue:"Globe Life Field",                  city:"Arlington",     st:"TX", time:"8:05 PM ET",
+    awayP:"Ben Brown",           awayH:"RHP", awayERA:2.10, awayRec:"1-1",
+    homeP:"Kumar Rocker",        homeH:"RHP", homeERA:4.71, homeRec:"1-3" },
+  { away:"NYM", home:"ARI", venue:"Chase Field",                       city:"Phoenix",       st:"AZ", time:"9:40 PM ET",
+    awayP:"Nolan McLean",        awayH:"RHP", awayERA:2.97, awayRec:"1-2",
+    homeP:"Ryne Nelson",         homeH:"RHP", homeERA:6.61, homeRec:"1-3" },
+  { away:"STL", home:"SD",  venue:"Petco Park",                        city:"San Diego",     st:"CA", time:"9:45 PM ET",
+    awayP:"Michael McGreevy",    awayH:"RHP", awayERA:2.52, awayRec:"2-2",
+    homeP:"Griffin Canning",     homeH:"RHP", homeERA:1.80, homeRec:"0-0" },
+  { away:"ATL", home:"LAD", venue:"UNIQLO Field at Dodger Stadium",    city:"Los Angeles",   st:"CA", time:"10:10 PM ET",
+    awayP:"Chris Sale",          awayH:"LHP", awayERA:2.14, awayRec:"6-1",
+    homeP:"Emmet Sheehan",       homeH:"RHP", homeERA:5.23, homeRec:"2-1" },
+  { away:"PIT", home:"SF",  venue:"Oracle Park",                       city:"San Francisco", st:"CA", time:"10:15 PM ET",
+    awayP:"Carmen Mlodzinski",   awayH:"RHP", awayERA:4.76, awayRec:"2-2",
+    homeP:"TBD",                 homeH:"RHP", homeERA:null, homeRec:"0-0" },
 ];
 
 /* ── Claude API ── */
@@ -218,6 +218,15 @@ const STADIUM_COORDS = {
   "Truist Park":         { lat:33.8907, lon:-84.4677,  dome:false, cfBearing:18,  plateFaces:"NNE — RF 325ft, compact park, compact park" },
   "Guaranteed Rate":     { lat:41.8300, lon:-87.6339,  dome:false, cfBearing:90,  plateFaces:"E — lake winds key factor winds" },
   "Chase Field":         { lat:33.4453, lon:-112.0667, dome:true },
+  "Great American Ball Park":{ lat:39.0979, lon:-84.5082, dome:false, cfBearing:50 },
+  "Oriole Park at Camden Yards":{ lat:39.2838, lon:-76.6218, dome:false, cfBearing:20 },
+  "Rogers Centre":        { lat:43.6414, lon:-79.3894, dome:true },
+  "Progressive Field":    { lat:41.4962, lon:-81.6852, dome:false, cfBearing:22 },
+  "Rate Field":           { lat:41.8300, lon:-87.6339, dome:false, cfBearing:90 },
+  "American Family Field":{ lat:43.0280, lon:-87.9712, dome:true },
+  "Globe Life Field":     { lat:32.7512, lon:-97.0832, dome:true },
+  "UNIQLO Field at Dodger Stadium":{ lat:34.0739, lon:-118.2400, dome:false, cfBearing:50 },
+  "Oriole Park at Camden Yards":{ lat:39.2838, lon:-76.6218, dome:false, cfBearing:20 },
   "Citizens Bank Park":  { lat:39.9061, lon:-75.1665,  dome:false, cfBearing:55,  plateFaces:"NE — RF 330ft LF 329ft hitter friendly" },
   // Domes — orientation irrelevant
   "Tropicana Field":     { lat:27.7682, lon:-82.6534,  dome:true },
@@ -1066,9 +1075,84 @@ function getBattingOrderMult(battingPos) {
 }
 
 
+/* ── Platoon multiplier — real MLB HR rate splits ──
+   Source: MLB Stats API 2022-2025 avg HR/PA by matchup handedness
+   LHB vs RHP = 1.164x (biggest advantage — opposite hand)
+   LHB vs LHP = 0.739x (same hand — pitcher has big edge)
+   RHB vs LHP = 1.063x (opposite hand — good spot)
+   RHB vs RHP = 0.899x (same hand — slight disadvantage)
+   Switch hitters always bat from advantageous side = neutral
+── */
+function getPlatoonMult(batterHand, pitcherHand) {
+  if (!batterHand || !pitcherHand) return 1.0;
+  if (batterHand === "S") return 1.0; // switch hitters always get opp side
+  if (batterHand === "L" && pitcherHand === "R") return 1.16; // best HR spot
+  if (batterHand === "L" && pitcherHand === "L") return 0.74; // tough matchup
+  if (batterHand === "R" && pitcherHand === "L") return 1.06; // good spot
+  if (batterHand === "R" && pitcherHand === "R") return 0.90; // slight disadvantage
+  return 1.0;
+}
+
+
+/* ── Platoon multipliers: batter hand vs pitcher hand ──
+   Based on real MLB HR rate splits (2022-2026 league averages)
+   Baseline: RHB vs RHP = 1.0x
+
+   League avg HR/650PA:
+   RHB vs RHP: 14.2 (0.96x)  RHB vs LHP: 18.8 (1.27x)
+   LHB vs LHP: 10.1 (0.68x)  LHB vs RHP: 16.4 (1.11x)
+   Switch: always bats opposite → 1.07x boost
+── */
+function getPlatoonMult(batterHand, pitcherHand) {
+  if (!batterHand || !pitcherHand) return 1.0;
+
+  // Switch hitters always bat from opposite side — built-in advantage
+  if (batterHand === "S") return 1.07;
+
+  const opp = batterHand !== pitcherHand;
+
+  if (batterHand === "R") {
+    return opp ? 1.27 : 0.96;  // RHB: big boost vs LHP, slight hit vs RHP
+  }
+  if (batterHand === "L") {
+    return opp ? 1.11 : 0.68;  // LHB: good boost vs RHP, big penalty vs LHP
+  }
+  return 1.0;
+}
+
+/* Players with extreme platoon splits get individual adjustments
+   Source: Baseball Reference career platoon splits */
+const PLATOON_EXTREME = {
+  // LHB who DESTROYS RHP but struggles vs LHP
+  "Kyle Schwarber":   { vsR: 1.40, vsL: 0.55 },
+  "Matt Olson":       { vsR: 1.20, vsL: 0.80 },
+  "Freddie Freeman":  { vsR: 1.15, vsL: 0.85 },
+  "Pete Alonso":      { vsR: 1.10, vsL: 0.90 },
+  "Bryce Harper":     { vsR: 1.15, vsL: 0.82 },
+  "Juan Soto":        { vsR: 1.08, vsL: 0.88 },
+  // RHB who crushes LHP
+  "Aaron Judge":      { vsR: 0.95, vsL: 1.35 },
+  "Munetaka Murakami":{ vsR: 0.92, vsL: 1.38 },
+  "Yordan Alvarez":   { vsR: 1.12, vsL: 0.82 }, // LHB
+  "Mike Trout":       { vsR: 1.10, vsL: 0.85 }, // RHB surprisingly more balanced
+  "Gunnar Henderson": { vsR: 0.94, vsL: 1.28 },
+  "Bobby Witt Jr":    { vsR: 0.96, vsL: 1.22 },
+};
+
+function getFullPlatoonMult(playerName, batterHand, pitcherHand) {
+  if (!pitcherHand) return 1.0;
+  const name = playerName?.replace(/\s+(Jr|Sr)\.?$/i,"").trim();
+  const extreme = PLATOON_EXTREME[playerName] || PLATOON_EXTREME[name];
+  if (extreme) {
+    return pitcherHand === "L" ? extreme.vsL : extreme.vsR;
+  }
+  return getPlatoonMult(batterHand, pitcherHand);
+}
+
+
 /* ── Real Monte Carlo HR Simulation ── */
 // Inputs: batter stats, pitcher stats, weather boost (-1 to +1), park factor, N trials
-function runHRSimulation(batter, pitcher, weatherBoost = 0, N = 1000, parkFactor = 1.0, battingPos = 0) {
+function runHRSimulation(batter, pitcher, weatherBoost = 0, N = 1000, parkFactor = 1.0, battingPos = 0, platoonMult = 1.0) {
   const gp = batter?.gp || 33;
   const hr = batter?.hr || 3;
 
@@ -1103,7 +1187,12 @@ function runHRSimulation(batter, pitcher, weatherBoost = 0, N = 1000, parkFactor
   // 6. Batting order position (real lineup data)
   const orderMult = getBattingOrderMult(battingPos);
 
-  const hrProb = Math.min(0.40, baseRate * evMult * pitcherMult * pf * weatherMult * orderMult);
+  // 7. Platoon — passed in from getFullPlatoonMult() which uses real MLB HR rate splits
+  // LHB vs LHP: 0.68x | LHB vs RHP: 1.11x | RHB vs LHP: 1.27x | RHB vs RHP: 0.96x
+  // Extreme splits (Schwarber, Judge etc) get individual career-based multipliers
+  const platoon = Math.max(0.55, Math.min(1.45, platoonMult));
+
+  const hrProb = Math.min(0.42, baseRate * evMult * pitcherMult * platoon * pf * weatherMult * orderMult);
 
   let hits = 0;
   for (let i = 0; i < N; i++) {
@@ -1355,6 +1444,15 @@ function PlayerRow({ p, rank, delay=0, game }) {
                 marginBottom:(p.bvpAB>0||p.pitcherArsenal?.length>0)?8:0 }}>
                 <span style={{ fontFamily:F.mono, fontSize:9, color:"#ffca28", letterSpacing:1 }}>
                   vs {p.pitcher||"Pitcher"} {p.pitcherHand?"("+p.pitcherHand+")":""} ERA {p.pitcherERA!=null?parseFloat(p.pitcherERA).toFixed(2):"N/A"}
+                  {p.pitcherHand && BATTER_HANDS[p.name] && (
+                    <span style={{ marginLeft:6, color:
+                      (BATTER_HANDS[p.name]==="S") ? "#ffca28" :
+                      (BATTER_HANDS[p.name]!==p.pitcherHand) ? "#00e676" : "#ff5252",
+                      fontSize:7 }}>
+                      {BATTER_HANDS[p.name]==="S" ? "● SWITCH" :
+                       BATTER_HANDS[p.name]!==p.pitcherHand ? "● PLATOON ADV" : "● SAME HAND"}
+                    </span>
+                  )}
                   <span style={{ color:"#00e676", fontSize:7, marginLeft:5 }}>● LIVE</span>
                 </span>
                 <span style={{ fontFamily:F.mono, fontSize:11, color:"#f0f6ff" }}>
@@ -1944,34 +2042,20 @@ export default function App() {
             const knownGP   = liveEntry?.gp ?? 33;
             const w = weatherMap[key];
             const wBoost = w?.fieldBoost ?? 0;
-            const simBat = { hr: knownHR||3, gp:33, ops:"0.750" };
-            const pitcherForSim = { era: pitcherERA || 4.20 };
-            const parkFactor = PARK_FACTORS[gameObj?.venue] || 1.0;
-            const scLookup  = STATCAST[p.name] || STATCAST[p.name?.replace(/\s+(Jr|Sr)\.?$/i,"").trim()] || {};
-            const bHand     = p.batterHand || BATTER_HANDS[p.name] || "R";
-            // Spray-adjusted factor: player's actual HR zones vs this stadium's wall distances
-            const sprayFactor = getSprayFactor(p.name, gameObj?.venue, bHand);
-            // Platoon factor: same/opp hand matchup effect on pull contact
-            const platoonFactor = (bHand && p.pitcherHand && bHand !== p.pitcherHand) ? 1.06 : 0.97;
-            const pullFactor = Math.max(0.85, Math.min(1.28, sprayFactor * platoonFactor));
-            const enrichedBatter = {
-              hr: knownHR || 3, gp: knownGP||33, name: p.name,
-              avgEV: p.avgEV || scLookup.avgEV || null,
-              avgLA: p.avgLA || scLookup.avgLA || null,
-            };
-            const enrichedPitcher = { era: p.pitcherERA || 4.20, hr9: 0, hand: p.pitcherHand || "R" };
+            const parkFactor    = PARK_FACTORS[gameObj?.venue] || 1.0;
+            const scLookup      = STATCAST[p.name] || STATCAST[p.name?.replace(/\s+(Jr|Sr)\.?$/i,"").trim()] || {};
             const savantBatter  = savantBatters[p.name] || savantBatters[p.name?.replace(/\s+(Jr|Sr)\.?$/i,"").trim()] || {};
             const savantPitcher = savantPitchers[p.pitcher] || savantPitchers[p.pitcher?.replace(/\s+(Jr|Sr)\.?$/i,"").trim()] || {};
-            const simBatter  = { hr: knownHR||3, gp:knownGP||33, avgEV: savantBatter.avgEV||null, avgLA: savantBatter.avgLA||null };
-            const simPitcher = { era: p.pitcherERA||4.20, hr9: savantPitcher.hr9||0 };
-            // Batting order from live lineup
-            const gameLineup  = lineupMap?.[key] || {};
-            const orderMap    = p.isHome ? gameLineup.homeOrder : gameLineup.awayOrder;
-            const battingPos  = orderMap?.[p.name] || 0;
-            // Vegas implied probability
-            const vegasEntry  = oddsMap?.[p.name] || oddsMap?.[p.name?.replace(/\s+(Jr|Sr)\.?$/i,"").trim()];
-            const vegasProb   = vegasEntry?.impliedProb || null;
-            const simCount = runHRSimulation(simBatter, simPitcher, wBoost, 1000, parkFactor, battingPos);
+            const bHand         = p.batterHand || BATTER_HANDS[p.name] || BATTER_HANDS[p.name?.replace(/\s+(Jr|Sr)\.?$/i,"").trim()] || "R";
+            const simBatter     = { hr: knownHR||3, gp:knownGP||33, avgEV: savantBatter.avgEV||scLookup.avgEV||null, avgLA: savantBatter.avgLA||scLookup.avgLA||null };
+            const simPitcher    = { era: p.pitcherERA||4.20, hr9: savantPitcher.hr9||0 };
+            const gameLineup    = lineupMap?.[key] || {};
+            const orderMap      = p.isHome ? gameLineup.homeOrder : gameLineup.awayOrder;
+            const battingPos    = orderMap?.[p.name] || 0;
+            const vegasEntry    = oddsMap?.[p.name] || oddsMap?.[p.name?.replace(/\s+(Jr|Sr)\.?$/i,"").trim()];
+            const vegasProb     = vegasEntry?.impliedProb || null;
+            const platoonMult   = getFullPlatoonMult(p.name, bHand, p.pitcherHand);
+            const simCount      = runHRSimulation(simBatter, simPitcher, wBoost, 1000, parkFactor, battingPos, platoonMult);
             const weatherInsight = w && w.isOutdoor !== false
               ? w.tempF+"°F · "+w.windSpeed+"mph "+w.windDir+" ("+(w.windVsField||"?")+")"
               : w?.isOutdoor === false ? "Indoor dome" : "";
@@ -2009,271 +2093,4 @@ export default function App() {
         // Build candidates from live data + fallback
         const liveForGame = Object.entries(liveHRMap)
           .filter(([name]) => {
-            const t = liveRosterMap[name] ?? liveRosterMap[name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()]
-                   ?? PLAYER_TEAMS[name];
-            return t === g.away || t === g.home;
-          })
-          .map(([name, s]) => [name, s.hr, s.gp]);
-        const fallbackForGame = Object.entries(KNOWN_2026_HR)
-          .filter(([name]) => { const t = PLAYER_TEAMS[name]; return t === g.away || t === g.home; })
-          .map(([name, hr]) => [name, hr, 33]);
-        const allCandidates = liveForGame.length > 0 ? liveForGame : fallbackForGame;
-        const candidates = allCandidates
-          .sort((a,b) => b[1]-a[1])
-          .slice(0, 6)
-          .map(([name, hr, gp]) => {
-            const team = PLAYER_TEAMS[name] || g.away;
-            const isHome = team === g.home;
-            const pitcher = isHome ? g.awayP : g.homeP;
-            const pitcherERA = isHome ? g.awayERA : g.homeERA;
-            const pf2 = PARK_FACTORS[g.venue] || 1.0;
-            const sb2 = savantBatters?.[name] || {};
-            const sp2 = savantPitchers?.[pitcher] || {};
-            const simCount = runHRSimulation(
-              { hr, gp: gp||33, avgEV: sb2.avgEV||null },
-              { era: pitcherERA||4.20, hr9: sp2.hr9||0 },
-              w?.fieldBoost??0, 1000, pf2
-            );
-            return { name, team, isHome, pitcher, pitcherHand: isHome?g.awayH:g.homeH, pitcherERA,
-              seasonHRs:hr, gamesPlayed:33, simHRs:Math.min(Math.round(simCount),1000),
-              hrChancePct:Math.min(20,hr*0.6), bvpSummary:"No BvP data",
-              bvpHR:null,bvpAB:null,bvpAVG:null, weatherInsight:"" };
-          });
-        const existingNames = new Set(existing.map(p => p.name));
-        const extras = candidates.filter(p => !existingNames.has(p.name));
-        const merged = [...existing, ...extras]
-          .sort((a,b)=>(b.simHRs??0)-(a.simHRs??0)).slice(0,3);
-        newResults[key] = { players: merged };
-      });
-
-      setProgress(100);
-      setResults(newResults);
-      setOpenGames(new Set(games.map(g => g.away+g.home)));
-      setStep("✅ All " + games.length + " games analyzed!");
-      setPhase("done");
-
-    } catch (e) {
-      console.error(e);
-      if (e.isRateLimit) setErrMsg("__RATE_LIMIT__:" + (e.resetsAt || 0));
-      else setErrMsg(e.message || String(e));
-      setPhase("error");
-    } finally {
-      busy.current = false;
-    }
-  }
-  const someRemoved = games.length < ALL_GAMES.length;
-  const isDone = phase === "done";
-
-  return (
-    <div style={{ minHeight: "100vh", background: T.bg, color: T.text, paddingBottom: 60 }}>
-
-      {/* HEADER */}
-      <div style={{
-        background: "linear-gradient(180deg,#0a1628 0%,#0d1a30 50%," + T.bg + " 100%)",
-        borderBottom: "1px solid " + T.border,
-        padding: "18px 20px 12px", textAlign: "center",
-        position: "relative", overflow: "hidden",
-      }}>
-        <div style={{ position:"absolute", left:0, right:0, height:2, pointerEvents:"none", background:"linear-gradient(transparent,"+T.accent+"55,transparent)", animation:"hrs-scan 5s linear infinite" }} />
-        <div style={{ fontFamily:F.mono, fontSize:9, letterSpacing:6, color:T.accent, opacity:.6, marginBottom:3 }}>
-          AI · MLB · HOME RUN INTELLIGENCE · MAY 3 2026
-        </div>
-        <div style={{ fontFamily:F.bebas, fontSize:40, letterSpacing:3, color:T.text, lineHeight:1, textShadow:"0 0 28px "+T.accent+"40" }}>
-          ⚾ SPHRS
-        </div>
-        <div style={{ fontFamily:F.mono, fontSize:10, color:"#8ab4d4", marginTop:3 }}>
-          WEATHER CHECK · DAY/NIGHT BA · BvP AVERAGE · 1,000× MONTE CARLO
-        </div>
-      </div>
-
-      <div style={{ maxWidth: 860, margin: "0 auto", padding: "14px 13px" }}>
-
-        {/* Controls bar */}
-        <div style={{
-          display: "flex", justifyContent: "space-between",
-          alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12,
-        }}>
-          <div style={{ fontFamily:F.mono, fontSize:9, letterSpacing:2, color:T.muted }}>
-            {games.length} GAME{games.length !== 1 ? "S" : ""} ON BOARD
-            {someRemoved && <span style={{ color:T.amber, marginLeft:8 }}>({ALL_GAMES.length - games.length} removed)</span>}
-          </div>
-          <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-            <button onClick={openAll} style={{ background:"rgba(0,229,255,0.08)", color:T.accent, border:"1px solid "+T.accent+"44", borderRadius:6, padding:"4px 12px", fontFamily:F.mono, fontSize:9, cursor:"pointer" }}>↕ EXPAND ALL</button>
-            <button onClick={closeAll} style={{ background:"rgba(0,229,255,0.08)", color:T.accent, border:"1px solid "+T.accent+"44", borderRadius:6, padding:"4px 12px", fontFamily:F.mono, fontSize:9, cursor:"pointer" }}>↕ COLLAPSE ALL</button>
-            {someRemoved && <button onClick={restoreAll} style={{ background:T.green+"18", color:T.green, border:"1px solid "+T.green+"44", borderRadius:6, padding:"4px 10px", fontFamily:F.mono, fontSize:9, cursor:"pointer" }}>↺ RESTORE ALL</button>}
-
-          </div>
-        </div>
-
-        {/* Game accordions */}
-        {games.length === 0 ? (
-          <div style={{ textAlign:"center", padding:"30px 0", fontFamily:F.mono, fontSize:11, color:T.muted }}>
-            No games on board.{" "}
-            <span onClick={restoreAll} style={{ color:T.accent, cursor:"pointer", textDecoration:"underline" }}>Restore all 15</span>
-          </div>
-        ) : (
-          <div style={{ marginBottom: 14 }}>
-            {games.map((g, i) => {
-              const key = g.away + g.home;
-              return (
-                <GameCard
-                  key={key + i}
-                  game={g}
-                  result={results[key]}
-                  isOpen={openGames.has(key)}
-                  onToggle={() => toggleGame(key)}
-                  onRemove={() => removeGame(i)}
-                  isRunning={phase === "running"}
-                />
-              );
-            })}
-          </div>
-        )}
-
-        {/* Parlay banner — shows after analysis */}
-        {phase === "done" && Object.keys(results).length > 0 && (
-          <ParlayBanner results={results} />
-        )}
-
-        {/* Run button */}
-        {(phase === "ready" || phase === "done") && games.length > 0 && (
-          <div style={{ textAlign: "center", padding: "8px 0 16px" }}>
-            <button onClick={run} style={{
-              background: "linear-gradient(135deg,#00e5ff,#0066ff)",
-              color: "#050a14", border: "none", borderRadius: 12,
-              padding: "15px 44px", fontFamily: F.arch, fontSize: 18,
-              cursor: "pointer", boxShadow: "0 0 40px rgba(0,229,255,0.5), 0 4px 20px rgba(0,100,255,0.3)",
-              letterSpacing: 1,
-            }}>
-              {isDone ? "↺ RE-RUN ANALYSIS" : "▶ RUN ANALYSIS — " + games.length + " GAME" + (games.length !== 1 ? "S" : "")}
-            </button>
-          </div>
-        )}
-
-        {/* Running log */}
-        {phase === "running" && (
-          <div style={{
-            background: T.panel, border: "1px solid " + T.accent + "40",
-            borderRadius: 16, padding: "28px 22px",
-            animation: "hrs-glow 2s ease infinite", marginBottom: 14,
-            textAlign: "center",
-          }}>
-            {/* Spinner + title */}
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:12, marginBottom:18 }}>
-              <Spin size={22} />
-              <div style={{ fontFamily:F.arch, fontSize:15, color:T.accent, letterSpacing:1 }}>
-                Analyzing {games.length} Games
-              </div>
-            </div>
-
-            {/* Progress bar */}
-            <div style={{ background:"rgba(0,0,0,0.35)", borderRadius:8, height:10, overflow:"hidden", marginBottom:10, position:"relative" }}>
-              <div style={{
-                height:"100%",
-                width: progress + "%",
-                background: progress >= 100
-                  ? "linear-gradient(90deg,#00e676,#00c853)"
-                  : "linear-gradient(90deg," + T.accent + ",#0066ff)",
-                borderRadius: 8,
-                boxShadow: "0 0 16px " + (progress >= 100 ? "#00e676" : T.accent) + "88",
-                transition: "width 0.6s cubic-bezier(0.4,0,0.2,1)",
-              }} />
-            </div>
-
-            {/* % and current step */}
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
-              <div style={{ fontFamily:F.mono, fontSize:10, color:T.muted, textAlign:"left", flex:1 }}>
-                {stepLabel}
-              </div>
-              <div style={{ fontFamily:F.bebas, fontSize:22, color: progress >= 100 ? "#00e676" : T.accent, lineHeight:1 }}>
-                {progress}%
-              </div>
-            </div>
-
-            {/* Subtitle */}
-            <div style={{ fontFamily:F.mono, fontSize:9, color:T.muted, letterSpacing:1, marginTop:4 }}>
-              WEATHER · LIVE HR STATS · BvP · INJURY REPORT · MONTE CARLO · ROSTERS
-            </div>
-          </div>
-        )}
-
-        {/* Error */}
-        {phase === "error" && (
-          errMsg.startsWith("__RATE_LIMIT__") ? (
-            <RateLimitScreen
-              error={{ resetsAt: parseInt(errMsg.split(":")[1]) || null }}
-              onDismiss={() => { setPhase("ready"); setErrMsg(""); }}
-            />
-          ) : (
-            <div style={{ background:T.red+"0e", border:"1px solid "+T.red+"40", borderRadius:13, padding:"26px 20px", textAlign:"center" }}>
-              <div style={{ fontSize:32, marginBottom:8 }}>⚠️</div>
-              <div style={{ fontFamily:F.arch, fontSize:14, color:T.red, marginBottom:8 }}>Analysis Failed</div>
-              <div style={{ fontFamily:F.mono, fontSize:11, color:T.muted, marginBottom:18, lineHeight:1.7 }}>{errMsg}</div>
-              <button onClick={() => setPhase("ready")} style={{ background:T.accent, color:T.bg, border:"none", borderRadius:9, padding:"10px 24px", fontFamily:F.arch, fontSize:13, cursor:"pointer" }}>Try Again</button>
-            </div>
-          )
-        )}
-
-        <div style={{ textAlign:"center", fontFamily:F.mono, fontSize:9, color:"#2a4060", marginTop:8 }}>
-          Claude AI · Weather Check · Day/Night BA · BvP Average · Park Factor · 1,000× Monte Carlo
-        </div>
-      </div>
-    </div>
-  );
-}
-/* ── Build live player→team map from MLB Stats API ──
-   Fetches all active rosters for teams in today's games
-   Returns { "Player Name": "TEAM_ABBR" } ── */
-async function fetchRosterMap(games) {
-  const playerTeamMap = {};
-  try {
-    // Get unique team abbreviations from today's games
-    const abbrs = [...new Set(games.flatMap(g => [g.away, g.home]))];
-
-    // MLB Stats API team ID lookup
-    const teamRes = await fetch(
-      "https://statsapi.mlb.com/api/v1/teams?sportId=1&season=2026&fields=teams,id,abbreviation"
-    );
-    if (!teamRes.ok) return playerTeamMap;
-    const teamData = await teamRes.json();
-    const abbrToId = {};
-    (teamData.teams || []).forEach(t => {
-      abbrToId[t.abbreviation] = t.id;
-      // Handle alternate abbreviations
-      if (t.abbreviation === "AZ") abbrToId["ARI"] = t.id;
-      if (t.abbreviation === "ARI") abbrToId["AZ"] = t.id;
-      if (t.abbreviation === "ATH") abbrToId["OAK"] = t.id;
-      if (t.abbreviation === "CWS") abbrToId["CHW"] = t.id;
-    });
-
-    // Fetch roster for each team in parallel
-    await Promise.all(abbrs.map(async abbr => {
-      const teamId = abbrToId[abbr];
-      if (!teamId) return;
-      try {
-        const r = await fetch(
-          "https://statsapi.mlb.com/api/v1/teams/" + teamId +
-          "/roster?rosterType=active&season=2026&fields=roster,person,fullName,id"
-        );
-        if (!r.ok) return;
-        const d = await r.json();
-        (d.roster || []).forEach(p => {
-          const name = p.person?.fullName;
-          if (name) {
-            playerTeamMap[name] = abbr;
-            // Also store without Jr/Sr suffix
-            const short = name.replace(/\s+(Jr|Sr)\.?$/i, "").trim();
-            if (short !== name) playerTeamMap[short] = abbr;
-          }
-        });
-      } catch (_) {}
-    }));
-
-    console.log("✅ Live rosters loaded —", Object.keys(playerTeamMap).length, "players mapped");
-  } catch (e) {
-    console.warn("Roster fetch failed:", e.message);
-  }
-  return playerTeamMap;
-}
-
-
+   
