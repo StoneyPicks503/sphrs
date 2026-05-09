@@ -1131,6 +1131,22 @@ function getFullPlatoonMult(playerName, batterHand, pitcherHand) {
 }
 
 
+/* ── Fetch today's MLB schedule with live pitchers from MLB API ── */
+async function fetchSchedule() {
+  try {
+    const r = await fetch("/api/schedule");
+    if (!r.ok) return null;
+    const d = await r.json();
+    if (!d.ok || !d.data?.length) return null;
+    console.log("✅ Live schedule loaded —", d.data.length, "games for", d.date);
+    return d.data;
+  } catch(e) {
+    console.warn("Schedule fetch failed:", e.message);
+    return null;
+  }
+}
+
+
 /* ── Real Monte Carlo HR Simulation ── */
 // Inputs: batter stats, pitcher stats, weather boost (-1 to +1), park factor, N trials
 function runHRSimulation(batter, pitcher, weatherBoost = 0, N = 1000, parkFactor = 1.0, battingPos = 0, platoonMult = 1.0) {
@@ -1800,12 +1816,19 @@ export default function App() {
   const [games,    setGames]    = useState([...ALL_GAMES]);
   const [openGames, setOpenGames] = useState(new Set());
   const [phase,    setPhase]    = useState("ready");
+  const [scheduleLoaded, setScheduleLoaded] = useState(false);
 
-  // Auto-run once on load
+  // Load live schedule on mount — replaces hardcoded ALL_GAMES with real today's matchups
   useEffect(() => {
-    const timer = setTimeout(() => { if (phase === "ready") run(); }, 800);
-    return () => clearTimeout(timer);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    fetchSchedule().then(liveGames => {
+      if (liveGames && liveGames.length > 0) {
+        setGames(liveGames);
+        console.log("✅ Games updated to today\'s live slate:", liveGames.length, "games");
+      }
+      setScheduleLoaded(true);
+    });
+  }, []);
+
   const [logs,     setLogs]     = useState([]);
   const [stepLabel, setStepLabel] = useState("");
   const [progress,  setProgress]  = useState(0);
@@ -2079,17 +2102,4 @@ export default function App() {
         // Build candidates from live data + fallback
         const liveForGame = Object.entries(liveHRMap)
           .filter(([name]) => {
-            const t = liveRosterMap[name] ?? liveRosterMap[name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()]
-                   ?? PLAYER_TEAMS[name];
-            return t === g.away || t === g.home;
-          })
-          .map(([name, s]) => [name, s.hr, s.gp]);
-        const fallbackForGame = Object.entries(KNOWN_2026_HR)
-          .filter(([name]) => { const t = PLAYER_TEAMS[name]; return t === g.away || t === g.home; })
-          .map(([name, hr]) => [name, hr, 33]);
-        const allCandidates = liveForGame.length > 0 ? liveForGame : fallbackForGame;
-        const candidates = allCandidates
-          .sort((a,b) => b[1]-a[1])
-          .slice(0, 6)
-          .map(([name, hr, gp]) => {
-            const team = PLAYER_TEAMS[name] ||
+            const t = liveRosterMap[name] ?? liveRosterMap[name.r
