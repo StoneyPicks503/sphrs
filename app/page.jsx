@@ -45,51 +45,51 @@ function useAssets() {
 
 /* ── All 15 games ── */
 const ALL_GAMES = [
-  { away:"HOU", home:"CIN", venue:"Great American Ball Park",          city:"Cincinnati",    st:"OH", time:"6:10 PM ET",
-    awayP:"Mike Burrows",        awayH:"RHP", awayERA:5.97, awayRec:"1-4",
-    homeP:"Nick Lodolo",         homeH:"LHP", homeERA:null, homeRec:"0-0" },
-  { away:"COL", home:"PHI", venue:"Citizens Bank Park",                city:"Philadelphia",  st:"PA", time:"6:40 PM ET",
-    awayP:"Chase Dollander",     awayH:"RHP", awayERA:3.38, awayRec:"3-2",
-    homeP:"Jesus Luzardo",       homeH:"LHP", homeERA:5.09, homeRec:"3-3" },
-  { away:"ATH", home:"BAL", venue:"Oriole Park at Camden Yards",       city:"Baltimore",     st:"MD", time:"7:05 PM ET",
-    awayP:"Jacob Lopez",         awayH:"LHP", awayERA:6.60, awayRec:"2-2",
-    homeP:"Kyle Bradish",        homeH:"RHP", homeERA:5.03, homeRec:"1-4" },
-  { away:"LAA", home:"TOR", venue:"Rogers Centre",                     city:"Toronto",       st:"ON", time:"7:07 PM ET",
-    awayP:"Reid Detmers",        awayH:"LHP", awayERA:4.28, awayRec:"1-2",
-    homeP:"Dylan Cease",         homeH:"RHP", homeERA:3.05, homeRec:"2-1" },
-  { away:"WSH", home:"MIA", venue:"loanDepot Park",                    city:"Miami",         st:"FL", time:"7:10 PM ET",
-    awayP:"Foster Griffin",      awayH:"LHP", awayERA:2.27, awayRec:"3-1",
-    homeP:"Robby Snelling",      homeH:"LHP", homeERA:null, homeRec:"0-0" },
-  { away:"TB",  home:"BOS", venue:"Fenway Park",                       city:"Boston",        st:"MA", time:"7:10 PM ET",
-    awayP:"Jesse Scholtens",     awayH:"RHP", awayERA:3.18, awayRec:"3-1",
-    homeP:"Connelly Early",      homeH:"LHP", homeERA:3.79, homeRec:"2-2" },
-  { away:"MIN", home:"CLE", venue:"Progressive Field",                 city:"Cleveland",     st:"OH", time:"7:15 PM ET",
-    awayP:"Connor Prielipp",     awayH:"LHP", awayERA:3.86, awayRec:"1-0",
-    homeP:"Parker Messick",      homeH:"LHP", homeERA:2.40, homeRec:"3-1" },
-  { away:"SEA", home:"CWS", venue:"Rate Field",                        city:"Chicago",       st:"IL", time:"7:40 PM ET",
-    awayP:"Emerson Hancock",     awayH:"RHP", awayERA:2.59, awayRec:"2-1",
-    homeP:"Sean Burke",          homeH:"RHP", homeERA:2.72, homeRec:"2-2" },
-  { away:"NYY", home:"MIL", venue:"American Family Field",             city:"Milwaukee",     st:"WI", time:"7:40 PM ET",
-    awayP:"Max Fried",           awayH:"LHP", awayERA:2.39, awayRec:"4-1",
-    homeP:"Jacob Misiorowski",   homeH:"RHP", homeERA:2.84, homeRec:"2-2" },
-  { away:"DET", home:"KC",  venue:"Kauffman Stadium",                  city:"Kansas City",   st:"MO", time:"7:40 PM ET",
-    awayP:"Keider Montero",      awayH:"RHP", awayERA:3.48, awayRec:"2-2",
-    homeP:"Kris Bubic",          homeH:"LHP", homeERA:3.32, homeRec:"3-1" },
-  { away:"CHC", home:"TEX", venue:"Globe Life Field",                  city:"Arlington",     st:"TX", time:"8:05 PM ET",
-    awayP:"Ben Brown",           awayH:"RHP", awayERA:2.10, awayRec:"1-1",
-    homeP:"Kumar Rocker",        homeH:"RHP", homeERA:4.71, homeRec:"1-3" },
-  { away:"NYM", home:"ARI", venue:"Chase Field",                       city:"Phoenix",       st:"AZ", time:"9:40 PM ET",
-    awayP:"Nolan McLean",        awayH:"RHP", awayERA:2.97, awayRec:"1-2",
-    homeP:"Ryne Nelson",         homeH:"RHP", homeERA:6.61, homeRec:"1-3" },
-  { away:"STL", home:"SD",  venue:"Petco Park",                        city:"San Diego",     st:"CA", time:"9:45 PM ET",
-    awayP:"Michael McGreevy",    awayH:"RHP", awayERA:2.52, awayRec:"2-2",
-    homeP:"Griffin Canning",     homeH:"RHP", homeERA:1.80, homeRec:"0-0" },
-  { away:"ATL", home:"LAD", venue:"UNIQLO Field at Dodger Stadium",    city:"Los Angeles",   st:"CA", time:"10:10 PM ET",
-    awayP:"Chris Sale",          awayH:"LHP", awayERA:2.14, awayRec:"6-1",
-    homeP:"Emmet Sheehan",       homeH:"RHP", homeERA:5.23, homeRec:"2-1" },
-  { away:"PIT", home:"SF",  venue:"Oracle Park",                       city:"San Francisco", st:"CA", time:"10:15 PM ET",
-    awayP:"Carmen Mlodzinski",   awayH:"RHP", awayERA:4.76, awayRec:"2-2",
-    homeP:"TBD",                 homeH:"RHP", homeERA:null, homeRec:"0-0" },
+  { away:"LAA", home:"TOR", venue:"Rogers Centre",                      city:"Toronto",       st:"ON", time:"3:07 PM ET",
+    awayP:"Jack Kochanowicz",    awayH:"RHP", awayERA:3.05, awayRec:"2-1",
+    homeP:"Trey Yesavage",       homeH:"RHP", homeERA:0.96, homeRec:"1-1" },
+  { away:"ATH", home:"BAL", venue:"Oriole Park at Camden Yards",        city:"Baltimore",     st:"MD", time:"4:05 PM ET",
+    awayP:"Aaron Civale",        awayH:"RHP", awayERA:2.95, awayRec:"3-1",
+    homeP:"Shane Baz",           homeH:"RHP", homeERA:4.99, homeRec:"1-3" },
+  { away:"TB",  home:"BOS", venue:"Fenway Park",                        city:"Boston",        st:"MA", time:"4:10 PM ET",
+    awayP:"Nick Martinez",       awayH:"RHP", awayERA:1.71, awayRec:"3-1",
+    homeP:"Payton Tolle",        homeH:"LHP", homeERA:2.04, homeRec:"1-1" },
+  { away:"HOU", home:"CIN", venue:"Great American Ball Park",           city:"Cincinnati",    st:"OH", time:"4:10 PM ET",
+    awayP:"Spencer Arrighetti",  awayH:"RHP", awayERA:1.96, awayRec:"4-0",
+    homeP:"Chase Burns",         homeH:"RHP", homeERA:2.20, homeRec:"3-1" },
+  { away:"WSH", home:"MIA", venue:"loanDepot Park",                     city:"Miami",         st:"FL", time:"4:10 PM ET",
+    awayP:"Zack Littell",        awayH:"RHP", awayERA:7.24, awayRec:"1-4",
+    homeP:"Janson Junk",         homeH:"RHP", homeERA:2.82, homeRec:"2-3" },
+  { away:"COL", home:"PHI", venue:"Citizens Bank Park",                 city:"Philadelphia",  st:"PA", time:"6:05 PM ET",
+    awayP:"Kyle Freeland",       awayH:"LHP", awayERA:5.04, awayRec:"1-3",
+    homeP:"Aaron Nola",          homeH:"RHP", homeERA:5.06, homeRec:"2-3" },
+  { away:"MIN", home:"CLE", venue:"Progressive Field",                  city:"Cleveland",     st:"OH", time:"6:10 PM ET",
+    awayP:"Joe Ryan",            awayH:"RHP", awayERA:3.72, awayRec:"2-3",
+    homeP:"Tanner Bibee",        homeH:"RHP", homeERA:4.58, homeRec:"0-5" },
+  { away:"CHC", home:"TEX", venue:"Globe Life Field",                   city:"Arlington",     st:"TX", time:"7:05 PM ET",
+    awayP:"Edward Cabrera",      awayH:"RHP", awayERA:3.27, awayRec:"3-0",
+    homeP:"Jack Leiter",         homeH:"RHP", homeERA:5.45, homeRec:"1-3" },
+  { away:"NYY", home:"MIL", venue:"American Family Field",              city:"Milwaukee",     st:"WI", time:"7:10 PM ET",
+    awayP:"Cam Schlittler",      awayH:"RHP", awayERA:1.52, awayRec:"5-1",
+    homeP:"Kyle Harrison",       homeH:"LHP", homeERA:2.12, homeRec:"3-1" },
+  { away:"SEA", home:"CWS", venue:"Rate Field",                         city:"Chicago",       st:"IL", time:"7:10 PM ET",
+    awayP:"Luis Castillo",       awayH:"RHP", awayERA:6.29, awayRec:"0-3",
+    homeP:"Anthony Kay",         homeH:"LHP", homeERA:5.70, homeRec:"1-1" },
+  { away:"DET", home:"KC",  venue:"Kauffman Stadium",                   city:"Kansas City",   st:"MO", time:"7:10 PM ET",
+    awayP:"Burch Smith",         awayH:"RHP", awayERA:1.59, awayRec:"0-1",
+    homeP:"Michael Wacha",       homeH:"RHP", homeERA:3.05, homeRec:"3-2" },
+  { away:"STL", home:"SD",  venue:"Petco Park",                         city:"San Diego",     st:"CA", time:"7:15 PM ET",
+    awayP:"Dustin May",          awayH:"RHP", awayERA:5.15, awayRec:"3-3",
+    homeP:"Randy Vasquez",       homeH:"RHP", homeERA:3.20, homeRec:"3-1" },
+  { away:"NYM", home:"ARI", venue:"Chase Field",                        city:"Phoenix",       st:"AZ", time:"7:15 PM ET",
+    awayP:"Clay Holmes",         awayH:"RHP", awayERA:1.69, awayRec:"4-2",
+    homeP:"Merrill Kelly",       homeH:"RHP", homeERA:9.95, homeRec:"1-3" },
+  { away:"PIT", home:"SF",  venue:"Oracle Park",                        city:"San Francisco", st:"CA", time:"9:05 PM ET",
+    awayP:"Braxton Ashcraft",    awayH:"RHP", awayERA:3.02, awayRec:"1-2",
+    homeP:"Landen Roupp",        homeH:"RHP", homeERA:3.18, homeRec:"5-2" },
+  { away:"ATL", home:"LAD", venue:"UNIQLO Field at Dodger Stadium",     city:"Los Angeles",   st:"CA", time:"9:10 PM ET",
+    awayP:"Spencer Strider",     awayH:"RHP", awayERA:8.10, awayRec:"0-0",
+    homeP:"Blake Snell",         homeH:"LHP", homeERA:null, homeRec:"0-0" },
 ];
 
 /* ── Claude API ── */
@@ -1819,6 +1819,12 @@ export default function App() {
   const [games,    setGames]    = useState([...ALL_GAMES]);
   const [openGames, setOpenGames] = useState(new Set());
   const [phase,    setPhase]    = useState("ready");
+
+  // Auto-run once on load
+  useEffect(() => {
+    const timer = setTimeout(() => { if (phase === "ready") run(); }, 800);
+    return () => clearTimeout(timer);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [logs,     setLogs]     = useState([]);
   const [stepLabel, setStepLabel] = useState("");
   const [progress,  setProgress]  = useState(0);
@@ -2087,10 +2093,4 @@ export default function App() {
       // ── Guarantee every game has 3 players ──
       games.forEach(g => {
         const key = g.away + g.home;
-        const existing = newResults[key]?.players ?? [];
-        if (existing.length >= 3) return;
-        const w = weatherMap[key];
-        // Build candidates from live data + fallback
-        const liveForGame = Object.entries(liveHRMap)
-          .filter(([name]) => {
-   
+        const existing = newResults[key]?
