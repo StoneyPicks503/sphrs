@@ -1131,21 +1131,6 @@ function getFullPlatoonMult(playerName, batterHand, pitcherHand) {
 }
 
 
-/* ── Fetch today's MLB schedule with live pitchers from MLB API ── */
-async function fetchSchedule() {
-  try {
-    const r = await fetch("/api/schedule");
-    if (!r.ok) return null;
-    const d = await r.json();
-    if (!d.ok || !d.data?.length) return null;
-    console.log("✅ Live schedule loaded —", d.data.length, "games for", d.date);
-    return d.data;
-  } catch(e) {
-    console.warn("Schedule fetch failed:", e.message);
-    return null;
-  }
-}
-
 
 /* ── Real Monte Carlo HR Simulation ── */
 // Inputs: batter stats, pitcher stats, weather boost (-1 to +1), park factor, N trials
@@ -1816,7 +1801,7 @@ export default function App() {
   const [games,    setGames]    = useState([...ALL_GAMES]);
   const [openGames, setOpenGames] = useState(new Set());
   const [phase,    setPhase]    = useState("ready");
-  const [scheduleLoaded, setScheduleLoaded] = useState(false);
+
 
   const [logs,     setLogs]     = useState([]);
   const [stepLabel, setStepLabel] = useState("");
@@ -1892,20 +1877,9 @@ export default function App() {
     setPhase("running"); setLogs([]); setErrMsg(""); setProgress(0); setStepLabel("Starting...");
 
     try {
-      // ── Live schedule (pitchers + ERAs from MLB API) ──
-      setStep("📅 Fetching today\'s pitchers from MLB...");
-      const liveSchedule = await fetchSchedule();
-      if (liveSchedule && liveSchedule.length > 0) {
-        setGames(liveSchedule);
-        // games state updated via setGames above
-        setStep("✅ Live pitchers loaded — " + liveSchedule.length + " games");
-      } else {
-        setStep("⚠️ Using fallback pitcher data");
-      }
-
       // ── Weather ──
       setStep("🌤 Fetching weather...");
-      const activeGames = liveSchedule && liveSchedule.length > 0 ? liveSchedule : games;
+      const activeGames = games;
       const weatherMap = await fetchWeatherForGames(activeGames);
       setStep("✅ Weather ready");
 
@@ -2100,4 +2074,23 @@ export default function App() {
         const existing = newResults[key]?.players ?? [];
         if (existing.length >= 3) return;
         const w = weatherMap[key];
-   
+        // Build candidates from live data + fallback
+        const liveForGame = Object.entries(liveHRMap)
+          .filter(([name]) => {
+            const t = liveRosterMap[name] ?? liveRosterMap[name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()]
+                   ?? PLAYER_TEAMS[name];
+            return t === g.away || t === g.home;
+          })
+          .map(([name, s]) => [name, s.hr, s.gp]);
+        const fallbackForGame = Object.entries(KNOWN_2026_HR)
+          .filter(([name]) => { const t = PLAYER_TEAMS[name]; return t === g.away || t === g.home; })
+          .map(([name, hr]) => [name, hr, 33]);
+        const allCandidates = liveForGame.length > 0 ? liveForGame : fallbackForGame;
+        const candidates = allCandidates
+          .sort((a,b) => b[1]-a[1])
+          .slice(0, 6)
+          .map(([name, hr, gp]) => {
+            const team = PLAYER_TEAMS[name] || g.away;
+            const isHome = team === g.home;
+            const pitcher = isHome ? g.awayP : g.homeP;
+            const pitcherERA = isHome ? g.awayERA
