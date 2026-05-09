@@ -1075,25 +1075,6 @@ function getBattingOrderMult(battingPos) {
 }
 
 
-/* ── Platoon multiplier — real MLB HR rate splits ──
-   Source: MLB Stats API 2022-2025 avg HR/PA by matchup handedness
-   LHB vs RHP = 1.164x (biggest advantage — opposite hand)
-   LHB vs LHP = 0.739x (same hand — pitcher has big edge)
-   RHB vs LHP = 1.063x (opposite hand — good spot)
-   RHB vs RHP = 0.899x (same hand — slight disadvantage)
-   Switch hitters always bat from advantageous side = neutral
-── */
-function getPlatoonMult(batterHand, pitcherHand) {
-  if (!batterHand || !pitcherHand) return 1.0;
-  if (batterHand === "S") return 1.0; // switch hitters always get opp side
-  if (batterHand === "L" && pitcherHand === "R") return 1.16; // best HR spot
-  if (batterHand === "L" && pitcherHand === "L") return 0.74; // tough matchup
-  if (batterHand === "R" && pitcherHand === "L") return 1.06; // good spot
-  if (batterHand === "R" && pitcherHand === "R") return 0.90; // slight disadvantage
-  return 1.0;
-}
-
-
 /* ── Platoon multipliers: batter hand vs pitcher hand ──
    Based on real MLB HR rate splits (2022-2026 league averages)
    Baseline: RHB vs RHP = 1.0x
@@ -2073,8 +2054,7 @@ export default function App() {
               avgLA: scData.avgLA || null,
               pitcherWhip: null,
               seasonHRs:   knownHR ?? p.seasonHRs ?? null,
-              gamesPlayed: knownGP ?? p.gamesPlayed ?? 33,
-              gamesPlayed: 33,
+              gamesPlayed: knownGP || 33,
               simHRs:      Math.min(Math.round(simCount), 1000),
               battingPos,
               vegasProb,
@@ -2093,4 +2073,23 @@ export default function App() {
       // ── Guarantee every game has 3 players ──
       games.forEach(g => {
         const key = g.away + g.home;
-        const existing = newResults[key]?
+        const existing = newResults[key]?.players ?? [];
+        if (existing.length >= 3) return;
+        const w = weatherMap[key];
+        // Build candidates from live data + fallback
+        const liveForGame = Object.entries(liveHRMap)
+          .filter(([name]) => {
+            const t = liveRosterMap[name] ?? liveRosterMap[name.replace(/\s+(Jr|Sr)\.?$/i,"").trim()]
+                   ?? PLAYER_TEAMS[name];
+            return t === g.away || t === g.home;
+          })
+          .map(([name, s]) => [name, s.hr, s.gp]);
+        const fallbackForGame = Object.entries(KNOWN_2026_HR)
+          .filter(([name]) => { const t = PLAYER_TEAMS[name]; return t === g.away || t === g.home; })
+          .map(([name, hr]) => [name, hr, 33]);
+        const allCandidates = liveForGame.length > 0 ? liveForGame : fallbackForGame;
+        const candidates = allCandidates
+          .sort((a,b) => b[1]-a[1])
+          .slice(0, 6)
+          .map(([name, hr, gp]) => {
+            const team = PLAYER_TEAMS[name] ||
